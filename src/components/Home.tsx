@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage, getSupabase, isConfigured } from "@/lib/supabase";
@@ -38,6 +39,13 @@ function HomeInner() {
       ) : (
         <div className="space-y-4">
           <ProfileBar profile={auth.profile} onChange={auth.refresh} />
+          <Link
+            href="/history"
+            className="flex items-center justify-between rounded-2xl border border-amber-300/30 bg-amber-400/10 px-4 py-3 font-bold transition hover:bg-amber-400/20"
+          >
+            <span>🏆 لوحة الشرف وسجل المسابقات</span>
+            <span className="text-amber-200">←</span>
+          </Link>
       <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/5 p-1">
         {(["join", "create"] as const).map((t) => (
           <button

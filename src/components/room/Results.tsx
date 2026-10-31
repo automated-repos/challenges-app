@@ -48,9 +48,12 @@ export function Results({ players, userId }: { players: Player[]; userId: string
         ))}
       </ol>
 
-      <div className="text-center">
+      <div className="flex flex-wrap justify-center gap-3">
         <Link href="/" className="btn-primary inline-block">
           مسابقة جديدة
+        </Link>
+        <Link href="/history" className="btn-ghost inline-flex items-center px-5">
+          🏆 لوحة الشرف
         </Link>
       </div>
     </div>
