@@ -1,0 +1,36 @@
+@import "tailwindcss";
+
+@theme inline {
+  --font-sans: var(--font-cairo), system-ui, sans-serif;
+}
+
+body {
+  background: radial-gradient(circle at top, #1e1b4b 0%, #0f0a2e 55%, #07051a 100%);
+  color: #f1f5f9;
+  font-family: var(--font-cairo), system-ui, sans-serif;
+}
+
+@keyframes pop {
+  0% { transform: scale(0.9); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+.animate-pop { animation: pop 0.25s ease-out; }
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-6px); }
+  75% { transform: translateX(6px); }
+}
+.animate-shake { animation: shake 0.3s ease-in-out 2; }
+
+@layer components {
+  .input {
+    @apply w-full rounded-xl border border-white/15 bg-black/20 px-4 py-2.5 text-white outline-none transition placeholder:text-white/30 focus:border-indigo-400 focus:ring-2 focus:ring-indigo-400/30;
+  }
+  .btn-primary {
+    @apply rounded-xl bg-indigo-500 px-5 py-3 font-bold text-white shadow-lg transition hover:bg-indigo-400 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply rounded-xl border border-white/15 bg-white/5 px-4 py-2 text-sm font-semibold text-indigo-100 transition hover:bg-white/10 disabled:opacity-50;
+  }
+}
