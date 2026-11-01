@@ -38,7 +38,9 @@ export function QuestionView({
   const q = room.question;
   const isReveal = room.status === "reveal";
   const iBuzzed = room.buzzed_by === userId;
-  const lockedOut = room.locked_out.includes(userId);
+  // في وضع الفرق: من انضم بعد البدء بدون فريق يشاهد فقط
+  const spectator = room.team_size != null && players.find((p) => p.user_id === userId)?.team == null;
+  const lockedOut = spectator || room.locked_out.includes(userId);
   const nameOf = (id?: string | null) => {
     const p = players.find((x) => x.user_id === id);
     return p ? `${p.avatar} ${p.name}` : "متسابق";
@@ -206,7 +208,11 @@ export function QuestionView({
                   seconds={questionLeft}
                   total={room.question_seconds}
                 >
-                  🚫 أخطأت في هذا السؤال، انتظر السؤال التالي
+                  {spectator
+                    ? "👀 انضممت بعد البدء، أنت تشاهد فقط"
+                    : room.team_size != null
+                      ? "🚫 فريقك ممنوع من هذا السؤال، انتظر السؤال التالي"
+                      : "🚫 أخطأت في هذا السؤال، انتظر السؤال التالي"}
                 </Status>
               ) : (
                 <div className="flex flex-col items-center gap-2 sm:gap-3">

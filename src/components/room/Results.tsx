@@ -1,12 +1,14 @@
 import Link from "next/link";
-import { rankPlayers, type Player } from "@/lib/types";
+import { rankPlayers, type Player, type Room } from "@/lib/types";
+import { rankTeams, teamInfo, type TeamStanding } from "@/lib/teams";
 import { Avatar } from "../ui";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
-export function Results({ players, userId }: { players: Player[]; userId: string }) {
+export function Results({ players, userId, room }: { players: Player[]; userId: string; room: Room }) {
   const ranked = rankPlayers(players);
   const me = ranked.find((p) => p.user_id === userId);
+  const teams = room.team_size != null ? rankTeams(players) : [];
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -21,7 +23,11 @@ export function Results({ players, userId }: { players: Player[]; userId: string
         )}
       </section>
 
-      {ranked.length > 1 && <Podium top={ranked.slice(0, 3)} />}
+      {teams.length > 0 && <TeamResults teams={teams} myTeam={me?.team ?? null} />}
+
+      {teams.length === 0 && ranked.length > 1 && <Podium top={ranked.slice(0, 3)} />}
+
+      {teams.length > 0 && <h2 className="pt-2 text-center font-bold text-indigo-200">ترتيب اللاعبين</h2>}
 
       <ol className="space-y-2">
         {ranked.map((p) => (
@@ -80,5 +86,63 @@ function Podium({ top }: { top: ReturnType<typeof rankPlayers> }) {
         </div>
       ))}
     </div>
+  );
+}
+
+function TeamResults({ teams, myTeam }: { teams: TeamStanding[]; myTeam: number | null }) {
+  const winners = teams.filter((t) => t.rank === 1);
+  const tie = winners.length > 1;
+  const iWon = myTeam != null && winners.some((t) => t.team === myTeam);
+  return (
+    <section className="space-y-3">
+      <div className="animate-pop rounded-3xl border border-amber-300/50 bg-amber-400/15 p-5 text-center">
+        <div className="text-5xl">{tie ? "🤝" : "🏆"}</div>
+        <p className="mt-2 text-2xl font-black">
+          {tie
+            ? `تعادل بين ${winners.map((t) => teamInfo(t.team).name).join(" و")}`
+            : `فاز ${teamInfo(winners[0].team).emoji} ${teamInfo(winners[0].team).name}!`}
+        </p>
+        {myTeam != null && (
+          <p className="mt-1 text-indigo-100">{iWon ? "🎉 مبروك لفريقك!" : "حظ أوفر المرة القادمة 💪"}</p>
+        )}
+      </div>
+
+      <ol className="space-y-2">
+        {teams.map((t) => {
+          const info = teamInfo(t.team);
+          return (
+            <li
+              key={t.team}
+              className={`animate-pop rounded-2xl border px-4 py-3 ${info.card} ${
+                t.team === myTeam ? "ring-2 ring-white/60" : ""
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <span className="w-8 text-center text-2xl">{MEDALS[t.rank - 1] ?? t.rank}</span>
+                <span className={`flex-1 truncate text-lg font-black ${info.text}`}>
+                  {info.emoji} {info.name}
+                </span>
+                <span className="text-sm text-indigo-200">
+                  ✅ {t.correct} • ❌ {t.wrong}
+                </span>
+                <span dir="ltr" className="w-14 text-left text-2xl font-black tabular-nums">
+                  {t.score}
+                </span>
+              </div>
+              <div className="mt-2 flex flex-wrap gap-1.5 ps-11">
+                {t.members.map((p) => (
+                  <span key={p.user_id} className="flex items-center gap-1 rounded-full bg-black/20 px-2 py-0.5 text-sm">
+                    {p.avatar} {p.name}
+                    <span dir="ltr" className="text-xs text-indigo-200 tabular-nums">
+                      {p.score}
+                    </span>
+                  </span>
+                ))}
+              </div>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

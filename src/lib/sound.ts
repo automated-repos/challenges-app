@@ -24,4 +24,5 @@ export const sounds = {
   },
   wrong: () => tone(180, 0.35, "sawtooth"),
   tick: () => tone(1200, 0.04),
+  message: () => tone(740, 0.08, "triangle"),
 };

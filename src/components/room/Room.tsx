@@ -16,6 +16,7 @@ import { QuestionView } from "./QuestionView";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 import { VoiceChat } from "./VoiceChat";
+import { RoomChat } from "./RoomChat";
 
 export function RoomPage() {
   const code = parseRoomCode(useSearchParams().get("code") ?? "");
@@ -105,7 +106,9 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
         </div>
       )}
 
-      {room.status === "finished" && <Results players={players} userId={userId} />}
+      {room.status === "finished" && <Results players={players} userId={userId} room={room} />}
+
+      <RoomChat roomId={room.id} userId={userId} inGame={room.status === "question" || room.status === "reveal"} />
     </main>
   );
 }

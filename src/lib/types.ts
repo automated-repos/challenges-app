@@ -27,6 +27,8 @@ export interface Room {
   correct_index: number | null;
   reveal_until: string | null;
   last_event: GameEvent | null;
+  /** حجم الفريق في وضع الفرق (2-4)، أو null للعب الفردي */
+  team_size: number | null;
   updated_at: string;
 }
 
@@ -38,6 +40,10 @@ export interface Player {
   score: number;
   correct_count: number;
   wrong_count: number;
+  /** ضغط "جاهز" في غرفة الانتظار */
+  ready: boolean;
+  /** رقم الفريق في وضع الفرق، أو null */
+  team: number | null;
   joined_at: string;
 }
 

@@ -125,9 +125,10 @@ export function useRoom(code: string, userId: string) {
       const { data, error } = await getSupabase().rpc(fn, { p_room: roomId, ...args });
       if (error) throw error;
       refreshRoom();
+      refreshPlayers();
       return data;
     },
-    [roomId, refreshRoom],
+    [roomId, refreshRoom, refreshPlayers],
   );
 
   const join = useCallback(
