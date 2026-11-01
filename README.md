@@ -16,7 +16,9 @@
 6. [`supabase/migrations/0006_teams.sql`](supabase/migrations/0006_teams.sql): وضع الفرق
 7. [`supabase/migrations/0007_gifts.sql`](supabase/migrations/0007_gifts.sql): إهداء النقاط
 8. [`supabase/migrations/0008_sticker_cost.sql`](supabase/migrations/0008_sticker_cost.sql): ملصقات تخصم نقاطاً
-9. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+9. [`supabase/migrations/0009_difficulty.sql`](supabase/migrations/0009_difficulty.sql): مستوى الصعوبة
+10. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+11. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
@@ -48,7 +50,7 @@ supabase functions deploy voice-token --no-verify-jwt
 الدالة [`voice-token`](supabase/functions/voice-token/index.ts) تتحقق بنفسها من تسجيل الدخول ومن أن اللاعب عضو في الغرفة قبل إعطائه تذكرة الصوت. المفتاح السري لا يصل للمتصفح أبداً.
 
 ## طريقة اللعب
-1. منشئ الغرفة يختار المجالات (أو الكل) وعدد الأسئلة والأوقات والنقاط، فيحصل على رمز من 6 أرقام.
+1. منشئ الغرفة يختار المجالات (أو الكل) ومستوى الصعوبة (سهل / متوسط / صعب / مختلط) وعدد الأسئلة والأوقات والنقاط، فيحصل على رمز من 6 أرقام.
 2. المتسابقون يسجلون الدخول ويدخلون الرمز من أجهزتهم.
    كل متسابق يضغط **أنا جاهز**، ومنشئ الغرفة لا يستطيع البدء إلا بعد جاهزية الجميع.
    **وضع الفرق (اختياري):** منشئ الغرفة يختار فرقاً من 2 أو 3 أو 4، وكل لاعب يختار فريقه أو يضغط منشئ الغرفة **توزيع عشوائي**. الإجابة الخاطئة تمنع الفريق كله من السؤال، والفائز هو الفريق صاحب أعلى مجموع نقاط.
@@ -60,7 +62,7 @@ supabase functions deploy voice-token --no-verify-jwt
 8. صفحة **لوحة الشرف** تعرض مجموع نقاط كل لاعب عبر كل المسابقات وعدد انتصاراته، وصفحة **السجل** تعرض كل مسابقة: متى انتهت ومن فاز بها.
 
 ## إضافة أسئلة
-أضفها في `supabase/seed_more.sql` بنفس الشكل (`correct_index` يبدأ من 0) وأعد تشغيله، أو من **Table Editor** مباشرة.
+أضفها في `supabase/seed_more.sql` بنفس الشكل (`correct_index` يبدأ من 0) وأعد تشغيله، أو من **Table Editor** مباشرة. السؤال الجديد يكون **متوسطاً** تلقائياً، ويمكن تغيير عمود `difficulty` إلى `easy` أو `hard`.
 
 ## الحماية
 - الإجابة الصحيحة لا تصل لأي متصفح قبل كشف السؤال؛ التحقق يتم داخل قاعدة البيانات.

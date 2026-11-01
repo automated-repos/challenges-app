@@ -29,6 +29,8 @@ export interface Room {
   last_event: GameEvent | null;
   /** حجم الفريق في وضع الفرق (2-4)، أو null للعب الفردي */
   team_size: number | null;
+  /** مستوى صعوبة كل الأسئلة، أو null للمختلط */
+  difficulty: Difficulty | null;
   updated_at: string;
 }
 
@@ -60,7 +62,19 @@ export interface Category {
   name: string;
   icon: string;
   question_count: number;
+  easy_count: number;
+  medium_count: number;
+  hard_count: number;
 }
+
+export type Difficulty = "easy" | "medium" | "hard";
+
+export const DIFFICULTIES: { value: Difficulty | null; label: string }[] = [
+  { value: null, label: "🎲 مختلط" },
+  { value: "easy", label: "🟢 سهل" },
+  { value: "medium", label: "🟡 متوسط" },
+  { value: "hard", label: "🔴 صعب" },
+];
 
 /** ترتيب اللاعبين: المتساوون في النقاط يأخذون نفس المركز */
 export function rankPlayers(players: Player[]) {

@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage, getSupabase, isConfigured } from "@/lib/supabase";
 import { parseRoomCode } from "@/lib/roomCode";
-import type { Category } from "@/lib/types";
+import { DIFFICULTIES, type Category, type Difficulty } from "@/lib/types";
 import { SetupNotice } from "./SetupNotice";
 import { useAuth } from "./auth/useAuth";
 import { AuthForm } from "./auth/AuthForm";
@@ -120,6 +120,7 @@ function CreateForm() {
   const [answerSeconds, setAnswerSeconds] = useState(10);
   const [pointsCorrect, setPointsCorrect] = useState(10);
   const [pointsWrong, setPointsWrong] = useState(5);
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -137,7 +138,7 @@ function CreateForm() {
 
   const available = categories
     ? (selected.length ? categories.filter((c) => selected.includes(c.id)) : categories).reduce(
-        (sum, c) => sum + Number(c.question_count),
+        (sum, c) => sum + Number(difficulty ? c[`${difficulty}_count`] : c.question_count),
         0,
       )
     : 0;
@@ -158,6 +159,7 @@ function CreateForm() {
         p_answer_seconds: answerSeconds,
         p_points_correct: pointsCorrect,
         p_points_wrong: pointsWrong,
+        p_difficulty: difficulty,
       });
       if (error) throw error;
       router.push(`/room/?code=${data}`);
@@ -180,11 +182,21 @@ function CreateForm() {
             {categories.map((c) => (
               <Chip key={c.id} active={selected.includes(c.id)} onClick={() => toggle(c.id)}>
                 {c.icon} {c.name}
-                <span className="opacity-60"> ({c.question_count})</span>
+                <span className="opacity-60"> ({difficulty ? c[`${difficulty}_count`] : c.question_count})</span>
               </Chip>
             ))}
           </div>
         )}
+      </Field>
+
+      <Field label="مستوى الصعوبة">
+        <div className="flex flex-wrap gap-2">
+          {DIFFICULTIES.map((d) => (
+            <Chip key={d.label} active={difficulty === d.value} onClick={() => setDifficulty(d.value)}>
+              {d.label}
+            </Chip>
+          ))}
+        </div>
       </Field>
 
       <div className="grid grid-cols-2 gap-4">
@@ -197,11 +209,13 @@ function CreateForm() {
 
       {categories && total > available && (
         <p className="text-sm text-amber-300">
-          يوجد {available} سؤالاً فقط في المجالات المختارة، وسيُستخدم هذا العدد.
+          {available === 0
+            ? "لا توجد أسئلة بهذا المستوى في المجالات المختارة."
+            : `يوجد ${available} سؤالاً فقط ${difficulty ? "بهذا المستوى " : ""}في المجالات المختارة، وسيُستخدم هذا العدد.`}
         </p>
       )}
       {error && <ErrorBox>{error}</ErrorBox>}
-      <button disabled={busy || !categories} className="btn-primary w-full">
+      <button disabled={busy || !categories || available === 0} className="btn-primary w-full">
         {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
       </button>
     </form>

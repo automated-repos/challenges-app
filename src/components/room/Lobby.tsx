@@ -3,7 +3,7 @@
 import { useState } from "react";
 import { errorMessage } from "@/lib/supabase";
 import { copyText, roomLink } from "@/lib/roomCode";
-import type { Player, Room } from "@/lib/types";
+import { DIFFICULTIES, type Player, type Room } from "@/lib/types";
 import { Avatar, ErrorBox } from "../ui";
 import { LobbyTeams, TeamSettings } from "./LobbyTeams";
 
@@ -115,6 +115,7 @@ export function Lobby({
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
           <span>{room.total_questions} سؤال</span>
+          <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
           <span>+{room.points_correct} للصحيحة</span>
           <span>−{room.points_wrong} للخاطئة</span>
           <span>{room.question_seconds} ث للضغط</span>
