@@ -15,6 +15,7 @@ import { Lobby } from "./Lobby";
 import { QuestionView } from "./QuestionView";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
+import { VoiceChat } from "./VoiceChat";
 
 export function RoomPage() {
   const code = parseRoomCode(useSearchParams().get("code") ?? "");
@@ -84,6 +85,8 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
           <Avatar emoji={profile.avatar} size="sm" />
         </div>
       </header>
+
+      <VoiceChat roomId={room.id} />
 
       {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
 

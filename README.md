@@ -29,6 +29,19 @@ npm run dev
 
 > للتجربة وحدك: سجّل حسابين، وافتح الثاني في نافذة تصفح خفي (Incognito) أو متصفح آخر.
 
+### 3. الغرفة الصوتية (اختياري)
+يسمع اللاعبون بعضهم أثناء اللعب عبر [LiveKit](https://livekit.io). الخطة المجانية تعطي 5,000 دقيقة اتصال شهرياً (كل لاعب متصل يُحسب وحده).
+
+1. أنشئ حساباً في [cloud.livekit.io](https://cloud.livekit.io) ثم مشروعاً جديداً.
+2. من **Settings → API Keys** أنشئ مفتاحاً، وانسخ: رابط المشروع (`wss://...livekit.cloud`) و **API Key** و **API Secret**.
+3. من مجلد المشروع:
+```bash
+supabase link --project-ref <رقم-مشروع-supabase>
+supabase secrets set LIVEKIT_URL=wss://xxxx.livekit.cloud LIVEKIT_API_KEY=xxxx LIVEKIT_API_SECRET=xxxx
+supabase functions deploy voice-token --no-verify-jwt
+```
+الدالة [`voice-token`](supabase/functions/voice-token/index.ts) تتحقق بنفسها من تسجيل الدخول ومن أن اللاعب عضو في الغرفة قبل إعطائه تذكرة الصوت. المفتاح السري لا يصل للمتصفح أبداً.
+
 ## طريقة اللعب
 1. منشئ الغرفة يختار المجالات (أو الكل) وعدد الأسئلة والأوقات والنقاط، فيحصل على رمز من 6 أرقام.
 2. المتسابقون يسجلون الدخول ويدخلون الرمز من أجهزتهم.
