@@ -3,7 +3,8 @@
 // (حروف إنجليزية صغيرة وأرقام و _ فقط، حتى 20 حرفاً).
 // لا تحذف ولا تغيّر معرّفاً قديماً حتى تبقى الرسائل السابقة تظهر.
 //
-// ملصق صورة جديد: ضع الصورة في public/stickers/ (يفضّل مربعة، 512×512، webp أو png)
+// ملصق صورة جديد: ضع الصورة في public/stickers/ (يفضّل مربعة، 512×512، webp أو png أو gif)
+// الصور المتحركة (webp متحرك أو gif) تعمل كما هي.
 // ثم أضف سطراً في قسم الصور أدناه.
 //
 // ملصق صوتي جديد: ضع الملف في public/sounds/ (mp3 قصير، ثانية إلى 5 ثوانٍ)
@@ -46,8 +47,35 @@ export const STICKERS: Sticker[] = [
   { id: "img_11", kind: "image", file: "sticker_11.webp", label: "نظرة" },
   { id: "img_2", kind: "image", file: "sticker_2.png", label: "اهو غلاسة كده" },
   { id: "img_7", kind: "image", file: "sticker_7.png", label: "ولعت 🔥" },
+  { id: "img_kid_smile", kind: "image", file: "1.webp", label: "ابتسامة بريئة" },
+  { id: "img_happy", kind: "image", file: "2.webp", label: "مبسوط" },
+  { id: "img_thinking", kind: "image", file: "3.webp", label: "بفكر 🤔" },
+  { id: "img_cat_love", kind: "image", file: "4.webp", label: "بحبكم ❤️" },
+  { id: "img_messy_hair", kind: "image", file: "5.webp", label: "لسه صاحي" },
+  { id: "img_relaxed", kind: "image", file: "7.webp", label: "رايق" },
+  { id: "img_juice", kind: "image", file: "8.webp", label: "ساكت وبشرب العصير 🧃" },
+  { id: "img_monkey", kind: "image", file: "9.webp", label: "مصدوم 🐒" },
+  { id: "img_shy_girl", kind: "image", file: "10.webp", label: "بتدلع" },
+  { id: "img_hiding", kind: "image", file: "11.webp", label: "مكسوف 🙈" },
+  { id: "img_newspaper", kind: "image", file: "12.webp", label: "مش مهتم 📰" },
+  { id: "img_dance_wave", kind: "image", file: "13.webp", label: "رقصة 💃" },
+  { id: "img_kid_dance", kind: "image", file: "14.webp", label: "برقص 🕺" },
+  { id: "img_celebrate", kind: "image", file: "16.webp", label: "فرحان 🙌" },
+  { id: "img_cat_stare", kind: "image", file: "17.webp", label: "بص بص 👀" },
 
   { id: "snd_laeiba", kind: "sound", file: "ya_ibn_allaeiba.mp3", label: "يا ابن اللعيبه", emoji: "😎" },
+  { id: "snd_yamaa", kind: "sound", file: "yamaa.mp3", label: "يامااااا", emoji: "😱" },
+  { id: "snd_ayez_anam", kind: "sound", file: "ayez_anam.mp3", label: "انا عايز انام", emoji: "😴" },
+  { id: "snd_allahu_akbar", kind: "sound", file: "allahu_akbar_alek.mp3", label: "الله اكبر عليك", emoji: "🤲" },
+  { id: "snd_cat_laugh", kind: "sound", file: "cat_laugh.mp3", label: "ضحكة القطة", emoji: "😹" },
+  { id: "snd_samo_aleko", kind: "sound", file: "samo_aleko.mp3", label: "سامو عليكو", emoji: "👋" },
+  { id: "snd_dammartni", kind: "sound", file: "dammartni.mp3", label: "دمرتني", emoji: "💥" },
+  { id: "snd_enta_mnen", kind: "sound", file: "enta_mnen.mp3", label: "انت منين؟ انت من فرنسا؟", emoji: "🇫🇷" },
+  { id: "snd_ana_amalt_eh", kind: "sound", file: "ana_amalt_eh.mp3", label: "انا عملت ايه", emoji: "😳" },
+  { id: "snd_ragel_khodar", kind: "sound", file: "ragel_khodar.mp3", label: "انا راجل بتاع خضار وفاكهة", emoji: "🍅" },
+  { id: "snd_bydawar", kind: "sound", file: "bydawar_alaya.mp3", label: "بيدور عليا", emoji: "🔍" },
+  { id: "snd_rabena_ykremo", kind: "sound", file: "rabena_ykremo.mp3", label: "ربنا يكرمه", emoji: "🙏" },
+  { id: "snd_gomla", kind: "sound", file: "gomla_mortabta.mp3", label: "جملة مرتبطة باللي قبلها", emoji: "🤓" },
 ];
 
 /** رابط صورة الملصق (يعمل محلياً وعلى GitHub Pages) */
