@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { errorMessage, getSupabase, isConfigured } from "@/lib/supabase";
+import { parseRoomCode } from "@/lib/roomCode";
 import type { Category } from "@/lib/types";
 import { SetupNotice } from "./SetupNotice";
 import { useAuth } from "./auth/useAuth";
@@ -94,7 +95,7 @@ function JoinForm() {
       <Field label="رمز الغرفة">
         <input
           value={code}
-          onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+          onChange={(e) => setCode(parseRoomCode(e.target.value))}
           inputMode="numeric"
           placeholder="123456"
           dir="ltr"

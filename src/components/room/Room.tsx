@@ -4,6 +4,7 @@ import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { useState } from "react";
 import { errorMessage, isConfigured } from "@/lib/supabase";
+import { parseRoomCode } from "@/lib/roomCode";
 import type { Profile } from "@/lib/types";
 import { SetupNotice } from "../SetupNotice";
 import { Avatar, Center, ErrorBox } from "../ui";
@@ -16,7 +17,7 @@ import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 
 export function RoomPage() {
-  const code = (useSearchParams().get("code") ?? "").replace(/\D/g, "").slice(0, 6);
+  const code = parseRoomCode(useSearchParams().get("code") ?? "");
   if (!isConfigured) return <SetupNotice />;
   if (code.length !== 6)
     return (
@@ -68,9 +69,9 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
   const isHost = room.host_id === userId;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-4 py-6">
-      <header className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <Link href="/" className="text-xl font-black">
+    <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-6">
+      <header className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-6 sm:gap-3">
+        <Link href="/" className="text-lg font-black sm:text-xl">
           🏆 تحدي الأسئلة
         </Link>
         <div className="flex items-center gap-3">

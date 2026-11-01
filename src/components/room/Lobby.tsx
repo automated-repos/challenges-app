@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { errorMessage } from "@/lib/supabase";
+import { copyText, roomLink } from "@/lib/roomCode";
 import type { Player, Room } from "@/lib/types";
 import { Avatar, ErrorBox } from "../ui";
 
@@ -22,7 +23,7 @@ export function Lobby({
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [copied, setCopied] = useState(false);
+  const [notice, setNotice] = useState("");
 
   async function start() {
     setBusy(true);
@@ -35,10 +36,27 @@ export function Lobby({
     }
   }
 
-  async function copyLink() {
-    await navigator.clipboard.writeText(window.location.href);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+  function flash(msg: string) {
+    setNotice(msg);
+    setTimeout(() => setNotice(""), 2000);
+  }
+
+  async function copyCode() {
+    flash((await copyText(room.code)) ? "✓ تم نسخ الرمز" : "تعذّر النسخ");
+  }
+
+  async function shareLink() {
+    const url = roomLink(room.code);
+    // على الهاتف: قائمة المشاركة (واتساب وغيره). على الكمبيوتر: نسخ الرابط
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "تحدي الأسئلة", text: `انضم لمسابقتي! رمز الغرفة: ${room.code}`, url });
+        return;
+      } catch (e) {
+        if (e instanceof DOMException && e.name === "AbortError") return; // المستخدم أغلق القائمة
+      }
+    }
+    flash((await copyText(url)) ? "✓ تم نسخ رابط الغرفة" : "تعذّر النسخ");
   }
 
   const sorted = [...players].sort((a, b) => a.joined_at.localeCompare(b.joined_at));
@@ -50,9 +68,15 @@ export function Lobby({
         <p dir="ltr" className="my-3 font-mono text-6xl font-black tracking-[0.3em]">
           {room.code}
         </p>
-        <button onClick={copyLink} className="btn-ghost">
-          {copied ? "✓ تم النسخ" : "📋 نسخ رابط الغرفة"}
-        </button>
+        <div className="flex flex-wrap justify-center gap-2">
+          <button onClick={copyCode} className="btn-ghost">
+            📋 نسخ الرمز
+          </button>
+          <button onClick={shareLink} className="btn-ghost">
+            🔗 مشاركة رابط الغرفة
+          </button>
+        </div>
+        <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
           <span>{room.total_questions} سؤال</span>
           <span>+{room.points_correct} للصحيحة</span>
