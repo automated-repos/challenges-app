@@ -2,8 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { errorMessage, getSupabase } from "@/lib/supabase";
-import { sounds } from "@/lib/sound";
-import { getSticker, STICKERS, stickerSrc, type Sticker } from "@/lib/stickers";
+import { playClip, sounds } from "@/lib/sound";
+import { getSticker, soundSrc, STICKERS, stickerSrc, type Sticker } from "@/lib/stickers";
 
 interface Message {
   id: number;
@@ -24,32 +24,34 @@ const EMOJI_STICKERS = STICKERS.filter((s): s is EmojiSticker => s.kind === "emo
 const PHRASE_STICKERS = STICKERS.filter((s): s is PhraseStickerT => s.kind === "phrase");
 type ImageStickerT = Extract<Sticker, { kind: "image" }>;
 const IMAGE_STICKERS = STICKERS.filter((s): s is ImageStickerT => s.kind === "image");
+type SoundStickerT = Extract<Sticker, { kind: "sound" }>;
+const SOUND_STICKERS = STICKERS.filter((s): s is SoundStickerT => s.kind === "sound");
+
+const MUTE_KEY = "chat-sounds-muted";
 
 /** لا نترك التركيز على الأزرار حتى لا تضغطها المسافة (زر الإجابة في اللعبة) */
 const blur = (e: MouseEvent<HTMLButtonElement>) => e.currentTarget.blur();
 
-function useChat(roomId: string, userId: string, onIncoming: (m: Message) => void) {
+/** onLive: يُستدعى لكل رسالة جديدة وصلت أثناء وجودنا (بما فيها رسائلي)، وليس لرسائل السجل القديمة */
+function useChat(roomId: string, onLive: (m: Message) => void) {
   const [messages, setMessages] = useState<Message[]>([]);
   const lastId = useRef(0);
-  const onIncomingRef = useRef(onIncoming);
+  const onLiveRef = useRef(onLive);
   useEffect(() => {
-    onIncomingRef.current = onIncoming;
+    onLiveRef.current = onLive;
   });
 
-  const merge = useCallback(
-    (incoming: Message[], notify: boolean) => {
-      const fresh = incoming.filter((m) => m.id > lastId.current).sort((a, b) => a.id - b.id);
-      if (!fresh.length) return;
-      lastId.current = fresh[fresh.length - 1].id;
-      setMessages((prev) => [...prev, ...fresh].slice(-200));
-      if (notify) fresh.filter((m) => m.user_id !== userId).forEach((m) => onIncomingRef.current(m));
-    },
-    [userId],
-  );
+  const merge = useCallback((incoming: Message[], live: boolean) => {
+    const fresh = incoming.filter((m) => m.id > lastId.current).sort((a, b) => a.id - b.id);
+    if (!fresh.length) return;
+    lastId.current = fresh[fresh.length - 1].id;
+    setMessages((prev) => [...prev, ...fresh].slice(-200));
+    if (live) fresh.forEach((m) => onLiveRef.current(m));
+  }, []);
 
   // يجلب ما فاتنا (عند الاشتراك أو بعد الإرسال)
   const fetchNew = useCallback(
-    async (notify: boolean) => {
+    async (live: boolean) => {
       const { data } = await getSupabase()
         .from("room_messages")
         .select("*")
@@ -57,7 +59,7 @@ function useChat(roomId: string, userId: string, onIncoming: (m: Message) => voi
         .gt("id", lastId.current)
         .order("id", { ascending: false })
         .limit(HISTORY);
-      if (data) merge(data as Message[], notify);
+      if (data) merge(data as Message[], live);
     },
     [roomId, merge],
   );
@@ -87,7 +89,7 @@ function useChat(roomId: string, userId: string, onIncoming: (m: Message) => voi
     async (body: string, kind: "text" | "sticker") => {
       const { error } = await getSupabase().rpc("send_message", { p_room: roomId, p_body: body, p_kind: kind });
       if (error) throw error;
-      fetchNew(false);
+      fetchNew(true);
     },
     [roomId, fetchNew],
   );
@@ -105,10 +107,24 @@ export function RoomChat({ roomId, userId, inGame }: { roomId: string; userId: s
     openRef.current = open;
   }, [open]);
 
+  const [muted, setMuted] = useState(() => typeof window !== "undefined" && localStorage.getItem(MUTE_KEY) === "1");
+  function toggleMuted() {
+    setMuted((m) => {
+      localStorage.setItem(MUTE_KEY, m ? "0" : "1");
+      return !m;
+    });
+  }
+
   const previewTimer = useRef<ReturnType<typeof setTimeout>>(undefined);
-  const { messages, send } = useChat(roomId, userId, (m) => {
-    sounds.message();
-    if (openRef.current) return;
+  const { messages, send } = useChat(roomId, (m) => {
+    const sticker = m.kind === "sticker" ? getSticker(m.body) : undefined;
+    // الملصق الصوتي يسمعه الجميع، بمن فيهم المرسل
+    if (sticker?.kind === "sound") {
+      if (!muted) playClip(soundSrc(sticker.file));
+    } else if (m.user_id !== userId && !muted) {
+      sounds.message();
+    }
+    if (m.user_id === userId || openRef.current) return;
     setUnread((n) => n + 1);
     setPreview(m);
     clearTimeout(previewTimer.current);
@@ -125,7 +141,16 @@ export function RoomChat({ roomId, userId, inGame }: { roomId: string; userId: s
 
   return (
     <>
-      {open && <ChatPanel messages={messages} userId={userId} send={send} onClose={() => setOpen(false)} />}
+      {open && (
+        <ChatPanel
+          messages={messages}
+          userId={userId}
+          send={send}
+          muted={muted}
+          onToggleMuted={toggleMuted}
+          onClose={() => setOpen(false)}
+        />
+      )}
 
       {!open && preview && (
         <button
@@ -162,11 +187,15 @@ function ChatPanel({
   messages,
   userId,
   send,
+  muted,
+  onToggleMuted,
   onClose,
 }: {
   messages: Message[];
   userId: string;
   send: (body: string, kind: "text" | "sticker") => Promise<void>;
+  muted: boolean;
+  onToggleMuted: () => void;
   onClose: () => void;
 }) {
   const [text, setText] = useState("");
@@ -208,7 +237,17 @@ function ChatPanel({
   return (
     <section className="animate-pop fixed inset-x-2 bottom-2 z-40 flex max-h-[70vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-indigo-950/95 shadow-2xl backdrop-blur sm:inset-x-auto sm:left-4 sm:bottom-4 sm:w-96">
       <header className="flex items-center justify-between border-b border-white/10 px-4 py-2.5">
-        <h2 className="font-bold">💬 دردشة الغرفة</h2>
+        <h2 className="flex-1 font-bold">💬 دردشة الغرفة</h2>
+        <button
+          onClick={(e) => {
+            blur(e);
+            onToggleMuted();
+          }}
+          className="rounded-lg px-2 py-1 text-lg hover:bg-white/10"
+          title={muted ? "تشغيل أصوات الدردشة" : "كتم أصوات الدردشة"}
+        >
+          {muted ? "🔇" : "🔊"}
+        </button>
         <button
           onClick={(e) => {
             blur(e);
@@ -232,6 +271,21 @@ function ChatPanel({
 
       {showStickers && (
         <div className="max-h-64 overflow-y-auto border-t border-white/10 p-2">
+          {SOUND_STICKERS.length > 0 && (
+            <div className="mb-2 flex flex-wrap gap-1.5">
+              {SOUND_STICKERS.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={(e) => sendSticker(e, s)}
+                  disabled={sending}
+                  title="يسمعه كل من في الغرفة"
+                  className="flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/25 disabled:opacity-50"
+                >
+                  🔊 {s.emoji} {s.label}
+                </button>
+              ))}
+            </div>
+          )}
           {IMAGE_STICKERS.length > 0 && (
             <div className="mb-2 grid grid-cols-4 gap-1.5">
               {IMAGE_STICKERS.map((s) => (
@@ -316,6 +370,19 @@ function ChatMessage({ m, mine, grouped }: { m: Message; mine: boolean; grouped:
             <div className="animate-sticker">
               {sticker.kind === "emoji" ? (
                 <span className="block text-5xl leading-tight">{sticker.emoji}</span>
+              ) : sticker.kind === "sound" ? (
+                <button
+                  onClick={(e) => {
+                    blur(e);
+                    playClip(soundSrc(sticker.file));
+                  }}
+                  title="إعادة التشغيل"
+                  className="flex items-center gap-2 rounded-2xl bg-linear-to-br from-amber-400 to-orange-600 px-4 py-2.5 text-lg font-black text-white shadow-lg transition hover:scale-105"
+                >
+                  <span className="text-2xl">{sticker.emoji}</span>
+                  {sticker.label}
+                  <span className="text-base">▶️</span>
+                </button>
               ) : sticker.kind === "image" ? (
                 <span className="block h-32 w-32 overflow-hidden rounded-2xl bg-white shadow-lg sm:h-36 sm:w-36">
                   <StickerImage s={sticker} />
@@ -369,5 +436,6 @@ function previewText(m: Message): string {
   if (!s) return "ملصق";
   if (s.kind === "emoji") return `${s.emoji} ملصق`;
   if (s.kind === "image") return `🖼️ ${s.label}`;
+  if (s.kind === "sound") return `🔊 ${s.label}`;
   return `${s.emoji} ${s.text}`;
 }

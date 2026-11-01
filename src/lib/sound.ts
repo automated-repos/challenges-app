@@ -26,3 +26,14 @@ export const sounds = {
   tick: () => tone(1200, 0.04),
   message: () => tone(740, 0.08, "triangle"),
 };
+
+// تشغيل مقطع صوتي (الملصقات الصوتية). مقطع واحد في كل مرة: الجديد يوقف السابق.
+let clip: HTMLAudioElement | null = null;
+
+export function playClip(src: string) {
+  if (typeof window === "undefined") return;
+  clip?.pause();
+  clip = new Audio(src);
+  clip.volume = 0.8;
+  clip.play().catch(() => {}); // المتصفح قد يمنع التشغيل قبل أول تفاعل مع الصفحة
+}
