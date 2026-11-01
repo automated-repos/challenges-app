@@ -1,9 +1,25 @@
 import { rankPlayers, type Player, type Room } from "@/lib/types";
 import { rankTeams, teamInfo } from "@/lib/teams";
 import { Avatar } from "../ui";
+import { GiftPoints } from "./GiftPoints";
 
-export function Scoreboard({ players, userId, room }: { players: Player[]; userId: string; room: Room }) {
-  if (room.team_size != null) return <TeamScoreboard players={players} userId={userId} room={room} />;
+type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
+
+export function Scoreboard({
+  players,
+  userId,
+  room,
+  call,
+}: {
+  players: Player[];
+  userId: string;
+  room: Room;
+  call: Call;
+}) {
+  const gift = (room.status === "question" || room.status === "reveal") && (
+    <GiftPoints players={players} userId={userId} call={call} />
+  );
+  if (room.team_size != null) return <TeamScoreboard players={players} userId={userId} room={room} gift={gift} />;
 
   const ranked = rankPlayers(players);
   return (
@@ -14,11 +30,22 @@ export function Scoreboard({ players, userId, room }: { players: Player[]; userI
           <PlayerRow key={p.user_id} p={p} label={String(p.rank)} userId={userId} room={room} />
         ))}
       </ol>
+      {gift && <div className="mt-3">{gift}</div>}
     </aside>
   );
 }
 
-function TeamScoreboard({ players, userId, room }: { players: Player[]; userId: string; room: Room }) {
+function TeamScoreboard({
+  players,
+  userId,
+  room,
+  gift,
+}: {
+  players: Player[];
+  userId: string;
+  room: Room;
+  gift: React.ReactNode;
+}) {
   const teams = rankTeams(players);
   const spectators = players.filter((p) => p.team == null);
   return (
@@ -48,6 +75,7 @@ function TeamScoreboard({ players, userId, room }: { players: Player[]; userId: 
       {spectators.length > 0 && (
         <p className="text-xs text-indigo-300">👀 يشاهدون: {spectators.map((p) => p.name).join("، ")}</p>
       )}
+      {gift}
     </aside>
   );
 }

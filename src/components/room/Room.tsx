@@ -102,7 +102,7 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
             offset={offset}
             call={call}
           />
-          <Scoreboard players={players} userId={userId} room={room} />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
         </div>
       )}
 

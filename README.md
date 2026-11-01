@@ -14,7 +14,9 @@
 4. [`supabase/migrations/0004_chat.sql`](supabase/migrations/0004_chat.sql): دردشة الغرفة والملصقات
 5. [`supabase/migrations/0005_ready.sql`](supabase/migrations/0005_ready.sql): زر "جاهز" قبل البدء
 6. [`supabase/migrations/0006_teams.sql`](supabase/migrations/0006_teams.sql): وضع الفرق
-7. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+7. [`supabase/migrations/0007_gifts.sql`](supabase/migrations/0007_gifts.sql): إهداء النقاط
+8. [`supabase/migrations/0008_sticker_cost.sql`](supabase/migrations/0008_sticker_cost.sql): ملصقات تخصم نقاطاً
+9. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
@@ -53,8 +55,9 @@ supabase functions deploy voice-token --no-verify-jwt
 3. يظهر السؤال للجميع، وأول من يضغط الزر (أو المسافة) يختار الإجابة (أو الأرقام 1-4).
 4. إجابة صحيحة: نقاط ثم السؤال التالي. إجابة خاطئة أو انتهاء الوقت: خصم، ويُمنع من هذا السؤال، ويُفتح للباقين.
 5. في النهاية تظهر لوحة الترتيب.
-6. زر 💬 أسفل الشاشة يفتح دردشة الغرفة: رسائل نصية وملصقات. لإضافة ملصقات عدّل [`src/lib/stickers.ts`](src/lib/stickers.ts).
-7. صفحة **لوحة الشرف** تعرض مجموع نقاط كل لاعب عبر كل المسابقات وعدد انتصاراته، وصفحة **السجل** تعرض كل مسابقة: متى انتهت ومن فاز بها.
+6. أثناء المسابقة: زر **🎁 إهداء نقاط** تحت الترتيب يحوّل جزءاً من نقاطك للاعب آخر كروح رياضية، ويظهر الإهداء للجميع في الدردشة.
+7. زر 💬 أسفل الشاشة يفتح دردشة الغرفة: رسائل نصية وملصقات. لإضافة ملصقات عدّل [`src/lib/stickers.ts`](src/lib/stickers.ts).
+8. صفحة **لوحة الشرف** تعرض مجموع نقاط كل لاعب عبر كل المسابقات وعدد انتصاراته، وصفحة **السجل** تعرض كل مسابقة: متى انتهت ومن فاز بها.
 
 ## إضافة أسئلة
 أضفها في `supabase/seed_more.sql` بنفس الشكل (`correct_index` يبدأ من 0) وأعد تشغيله، أو من **Table Editor** مباشرة.

@@ -11,7 +11,7 @@ interface Message {
   user_id: string;
   name: string;
   avatar: string;
-  kind: "text" | "sticker";
+  kind: "text" | "sticker" | "gift";
   body: string;
   created_at: string;
 }
@@ -147,6 +147,7 @@ export function RoomChat({ roomId, userId, inGame }: { roomId: string; userId: s
           userId={userId}
           send={send}
           muted={muted}
+          inGame={inGame}
           onToggleMuted={toggleMuted}
           onClose={() => setOpen(false)}
         />
@@ -188,6 +189,7 @@ function ChatPanel({
   userId,
   send,
   muted,
+  inGame,
   onToggleMuted,
   onClose,
 }: {
@@ -195,6 +197,7 @@ function ChatPanel({
   userId: string;
   send: (body: string, kind: "text" | "sticker") => Promise<void>;
   muted: boolean;
+  inGame: boolean;
   onToggleMuted: () => void;
   onClose: () => void;
 }) {
@@ -273,32 +276,53 @@ function ChatPanel({
         <div className="max-h-64 overflow-y-auto border-t border-white/10 p-2">
           {SOUND_STICKERS.length > 0 && (
             <div className="mb-2 flex flex-wrap gap-1.5">
-              {SOUND_STICKERS.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={(e) => sendSticker(e, s)}
-                  disabled={sending}
-                  title="يسمعه كل من في الغرفة"
-                  className="flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/25 disabled:opacity-50"
-                >
-                  🔊 {s.emoji} {s.label}
-                </button>
-              ))}
+              {SOUND_STICKERS.map((s) => {
+                const locked = !!s.cost && !inGame;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={(e) => sendSticker(e, s)}
+                    disabled={sending || locked}
+                    title={
+                      s.cost
+                        ? `يسمعه كل من في الغرفة • يخصم ${s.cost} نقاط منك${locked ? " (أثناء المسابقة فقط)" : ""}`
+                        : "يسمعه كل من في الغرفة"
+                    }
+                    className="flex items-center gap-1.5 rounded-full border border-amber-300/40 bg-amber-400/15 px-3 py-1.5 text-sm font-semibold text-amber-100 transition hover:bg-amber-400/25 disabled:opacity-50"
+                  >
+                    🔊 {s.emoji} {s.label}
+                    {s.cost && (
+                      <span dir="ltr" className="rounded-full bg-rose-600 px-1.5 text-xs font-black text-white">
+                        −{s.cost}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           )}
           {IMAGE_STICKERS.length > 0 && (
             <div className="mb-2 grid grid-cols-4 gap-1.5">
-              {IMAGE_STICKERS.map((s) => (
-                <button
-                  key={s.id}
-                  onClick={(e) => sendSticker(e, s)}
-                  disabled={sending}
-                  title={s.label}
-                  className="aspect-square overflow-hidden rounded-xl bg-white p-0.5 transition hover:scale-105 disabled:opacity-50"
-                >
-                  <StickerImage s={s} />
-                </button>
-              ))}
+              {IMAGE_STICKERS.map((s) => {
+                // الملصقات المدفوعة تُستخدم أثناء المسابقة فقط
+                const locked = !!s.cost && !inGame;
+                return (
+                  <button
+                    key={s.id}
+                    onClick={(e) => sendSticker(e, s)}
+                    disabled={sending || locked}
+                    title={
+                      s.cost
+                        ? `${s.label} • يخصم ${s.cost} نقاط منك${locked ? " (أثناء المسابقة فقط)" : ""}`
+                        : s.label
+                    }
+                    className="relative aspect-square overflow-hidden rounded-xl bg-white p-0.5 transition hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                  >
+                    <StickerImage s={s} />
+                    {s.cost && <CostBadge cost={s.cost} />}
+                  </button>
+                );
+              })}
             </div>
           )}
           <div className="grid grid-cols-8 gap-1">
@@ -359,6 +383,14 @@ function ChatPanel({
 }
 
 function ChatMessage({ m, mine, grouped }: { m: Message; mine: boolean; grouped: boolean }) {
+  if (m.kind === "gift")
+    return (
+      <div className="animate-sticker flex justify-center py-1">
+        <p className="rounded-full border border-amber-300/50 bg-amber-400/15 px-4 py-1.5 text-center text-sm font-bold text-amber-100">
+          🎁 {m.avatar} {m.name} {m.body} 🤝
+        </p>
+      </div>
+    );
   const sticker = m.kind === "sticker" ? getSticker(m.body) : undefined;
   return (
     <div className={`flex items-end gap-2 ${mine ? "flex-row-reverse" : ""}`}>
@@ -382,10 +414,16 @@ function ChatMessage({ m, mine, grouped }: { m: Message; mine: boolean; grouped:
                   <span className="text-2xl">{sticker.emoji}</span>
                   {sticker.label}
                   <span className="text-base">▶️</span>
+                  {sticker.cost && (
+                    <span dir="ltr" className="rounded-full bg-rose-600 px-1.5 text-xs font-black">
+                      −{sticker.cost}
+                    </span>
+                  )}
                 </button>
               ) : sticker.kind === "image" ? (
-                <span className="block h-32 w-32 overflow-hidden rounded-2xl bg-white shadow-lg sm:h-36 sm:w-36">
+                <span className="relative block h-32 w-32 overflow-hidden rounded-2xl bg-white shadow-lg sm:h-36 sm:w-36">
                   <StickerImage s={sticker} />
+                  {sticker.cost && <CostBadge cost={sticker.cost} />}
                 </span>
               ) : (
                 <PhraseSticker s={sticker} />
@@ -422,6 +460,17 @@ function PhraseSticker({ s, small = false }: { s: PhraseStickerT; small?: boolea
   );
 }
 
+function CostBadge({ cost }: { cost: number }) {
+  return (
+    <span
+      dir="ltr"
+      className="absolute top-1 left-1 rounded-full bg-rose-600 px-1.5 py-0.5 text-xs font-black text-white shadow"
+    >
+      −{cost}
+    </span>
+  );
+}
+
 function StickerImage({ s }: { s: ImageStickerT }) {
   return (
     // الموقع ثابت (static export) فلا حاجة لتحسين الصور عبر next/image
@@ -431,6 +480,7 @@ function StickerImage({ s }: { s: ImageStickerT }) {
 }
 
 function previewText(m: Message): string {
+  if (m.kind === "gift") return `🎁 ${m.body}`;
   if (m.kind !== "sticker") return m.body;
   const s = getSticker(m.body);
   if (!s) return "ملصق";

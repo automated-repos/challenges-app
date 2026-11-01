@@ -13,8 +13,23 @@
 export type Sticker =
   | { id: string; kind: "emoji"; emoji: string; label: string }
   | { id: string; kind: "phrase"; emoji: string; text: string; color: string }
-  | { id: string; kind: "image"; file: string; label: string }
-  | { id: string; kind: "sound"; file: string; label: string; emoji: string };
+  | {
+      id: string;
+      kind: "image";
+      file: string;
+      label: string;
+      /** نقاط تُخصم من المرسل. يجب أن تطابق دالة _sticker_cost في 0008_sticker_cost.sql */
+      cost?: number;
+    }
+  | {
+      id: string;
+      kind: "sound";
+      file: string;
+      label: string;
+      emoji: string;
+      /** نقاط تُخصم من المرسل. يجب أن تطابق دالة _sticker_cost في 0008_sticker_cost.sql */
+      cost?: number;
+    };
 
 export const STICKERS: Sticker[] = [
   { id: "laugh", kind: "emoji", emoji: "😂", label: "ضحك" },
@@ -55,7 +70,7 @@ export const STICKERS: Sticker[] = [
   { id: "img_relaxed", kind: "image", file: "7.webp", label: "رايق" },
   { id: "img_juice", kind: "image", file: "8.webp", label: "ساكت وبشرب العصير 🧃" },
   { id: "img_monkey", kind: "image", file: "9.webp", label: "مصدوم 🐒" },
-  { id: "img_shy_girl", kind: "image", file: "10.webp", label: "بتدلع" },
+  { id: "img_shy_girl", kind: "image", file: "10.webp", label: "بتدلع", cost: 5 },
   { id: "img_hiding", kind: "image", file: "11.webp", label: "مكسوف 🙈" },
   { id: "img_newspaper", kind: "image", file: "12.webp", label: "مش مهتم 📰" },
   { id: "img_dance_wave", kind: "image", file: "13.webp", label: "رقصة 💃" },
@@ -76,6 +91,16 @@ export const STICKERS: Sticker[] = [
   { id: "snd_bydawar", kind: "sound", file: "bydawar_alaya.mp3", label: "بيدور عليا", emoji: "🔍" },
   { id: "snd_rabena_ykremo", kind: "sound", file: "rabena_ykremo.mp3", label: "ربنا يكرمه", emoji: "🙏" },
   { id: "snd_gomla", kind: "sound", file: "gomla_mortabta.mp3", label: "جملة مرتبطة باللي قبلها", emoji: "🤓" },
+  { id: "snd_homar_helw", kind: "sound", file: "homar_helw.mp3", label: "عايزين حمار حلو زيك", emoji: "🫏", cost: 10 },
+  { id: "snd_shaklak_fahem", kind: "sound", file: "shaklak_fahem.mp3", label: "شكلك فاهم يا نصه", emoji: "🧐" },
+  { id: "snd_khasran", kind: "sound", file: "khasran_kol_haga.mp3", label: "انت خسران كل حاجة", emoji: "📉" },
+  { id: "snd_sadaqni", kind: "sound", file: "sadaqni_law_aaraf.mp3", label: "صدقني انا لو اعرف اقولك", emoji: "🤷" },
+  { id: "snd_hadretak", kind: "sound", file: "hadretak_betoul_eh.mp3", label: "حضرتك بتقول ايه", emoji: "🤨" },
+  { id: "snd_haydara", kind: "sound", file: "haydara.mp3", label: "انا الذي سمتني امي حيدرة", emoji: "🦁" },
+  { id: "snd_estislami", kind: "sound", file: "estislami.mp3", label: "انا بعلن استسلامي", emoji: "🏳️" },
+  { id: "snd_hasbiya_allah", kind: "sound", file: "hasbiya_allah.mp3", label: "حسبي الله ونعم الوكيل", emoji: "😤" },
+  { id: "snd_mostahil", kind: "sound", file: "mostahil.mp3", label: "مستحيل مستحيل", emoji: "🙅" },
+  { id: "snd_eskot", kind: "sound", file: "eskot.mp3", label: "اسكت", emoji: "🤫" },
 ];
 
 /** رابط صورة الملصق (يعمل محلياً وعلى GitHub Pages) */
