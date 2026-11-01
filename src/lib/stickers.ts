@@ -1,10 +1,15 @@
 // الملصقات المتاحة في دردشة الغرفة.
-// يُرسل المعرّف فقط (id)، فلإضافة ملصق جديد أضفه هنا بمعرّف إنجليزي قصير.
+// يُرسل المعرّف فقط (id)، فلإضافة ملصق جديد أضفه هنا بمعرّف إنجليزي قصير
+// (حروف إنجليزية صغيرة وأرقام و _ فقط، حتى 20 حرفاً).
 // لا تحذف ولا تغيّر معرّفاً قديماً حتى تبقى الرسائل السابقة تظهر.
+//
+// ملصق صورة جديد: ضع الصورة في public/stickers/ (يفضّل مربعة، 512×512، webp أو png)
+// ثم أضف سطراً في قسم الصور أدناه.
 
 export type Sticker =
   | { id: string; kind: "emoji"; emoji: string; label: string }
-  | { id: string; kind: "phrase"; emoji: string; text: string; color: string };
+  | { id: string; kind: "phrase"; emoji: string; text: string; color: string }
+  | { id: string; kind: "image"; file: string; label: string };
 
 export const STICKERS: Sticker[] = [
   { id: "laugh", kind: "emoji", emoji: "😂", label: "ضحك" },
@@ -32,7 +37,15 @@ export const STICKERS: Sticker[] = [
   { id: "hard", kind: "phrase", emoji: "😵", text: "صعبة مرة", color: "from-slate-500 to-slate-700" },
   { id: "comeon", kind: "phrase", emoji: "🔥", text: "يلا يلا", color: "from-orange-500 to-red-600" },
   { id: "gg", kind: "phrase", emoji: "🤝", text: "لعبة حلوة", color: "from-cyan-500 to-blue-600" },
+
+  { id: "img_1", kind: "image", file: "sticker_1.webp", label: "مين دا؟" },
+  { id: "img_11", kind: "image", file: "sticker_11.webp", label: "نظرة" },
+  { id: "img_2", kind: "image", file: "sticker_2.png", label: "اهو غلاسة كده" },
+  { id: "img_7", kind: "image", file: "sticker_7.png", label: "ولعت 🔥" },
 ];
+
+/** رابط صورة الملصق (يعمل محلياً وعلى GitHub Pages) */
+export const stickerSrc = (file: string) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/stickers/${file}`;
 
 const byId = new Map(STICKERS.map((s) => [s.id, s]));
 export const getSticker = (id: string) => byId.get(id);

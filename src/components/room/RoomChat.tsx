@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type MouseEvent } from "react";
 import { errorMessage, getSupabase } from "@/lib/supabase";
 import { sounds } from "@/lib/sound";
-import { getSticker, STICKERS, type Sticker } from "@/lib/stickers";
+import { getSticker, STICKERS, stickerSrc, type Sticker } from "@/lib/stickers";
 
 interface Message {
   id: number;
@@ -22,6 +22,8 @@ type EmojiSticker = Extract<Sticker, { kind: "emoji" }>;
 type PhraseStickerT = Extract<Sticker, { kind: "phrase" }>;
 const EMOJI_STICKERS = STICKERS.filter((s): s is EmojiSticker => s.kind === "emoji");
 const PHRASE_STICKERS = STICKERS.filter((s): s is PhraseStickerT => s.kind === "phrase");
+type ImageStickerT = Extract<Sticker, { kind: "image" }>;
+const IMAGE_STICKERS = STICKERS.filter((s): s is ImageStickerT => s.kind === "image");
 
 /** لا نترك التركيز على الأزرار حتى لا تضغطها المسافة (زر الإجابة في اللعبة) */
 const blur = (e: MouseEvent<HTMLButtonElement>) => e.currentTarget.blur();
@@ -229,7 +231,22 @@ function ChatPanel({
       </div>
 
       {showStickers && (
-        <div className="max-h-48 overflow-y-auto border-t border-white/10 p-2">
+        <div className="max-h-64 overflow-y-auto border-t border-white/10 p-2">
+          {IMAGE_STICKERS.length > 0 && (
+            <div className="mb-2 grid grid-cols-4 gap-1.5">
+              {IMAGE_STICKERS.map((s) => (
+                <button
+                  key={s.id}
+                  onClick={(e) => sendSticker(e, s)}
+                  disabled={sending}
+                  title={s.label}
+                  className="aspect-square overflow-hidden rounded-xl bg-white p-0.5 transition hover:scale-105 disabled:opacity-50"
+                >
+                  <StickerImage s={s} />
+                </button>
+              ))}
+            </div>
+          )}
           <div className="grid grid-cols-8 gap-1">
             {EMOJI_STICKERS.map((s) => (
               <button
@@ -299,6 +316,10 @@ function ChatMessage({ m, mine, grouped }: { m: Message; mine: boolean; grouped:
             <div className="animate-sticker">
               {sticker.kind === "emoji" ? (
                 <span className="block text-5xl leading-tight">{sticker.emoji}</span>
+              ) : sticker.kind === "image" ? (
+                <span className="block h-32 w-32 overflow-hidden rounded-2xl bg-white shadow-lg sm:h-36 sm:w-36">
+                  <StickerImage s={sticker} />
+                </span>
               ) : (
                 <PhraseSticker s={sticker} />
               )}
@@ -334,9 +355,19 @@ function PhraseSticker({ s, small = false }: { s: PhraseStickerT; small?: boolea
   );
 }
 
+function StickerImage({ s }: { s: ImageStickerT }) {
+  return (
+    // الموقع ثابت (static export) فلا حاجة لتحسين الصور عبر next/image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img src={stickerSrc(s.file)} alt={s.label} loading="lazy" draggable={false} className="h-full w-full object-contain" />
+  );
+}
+
 function previewText(m: Message): string {
   if (m.kind !== "sticker") return m.body;
   const s = getSticker(m.body);
   if (!s) return "ملصق";
-  return s.kind === "emoji" ? `${s.emoji} ملصق` : `${s.emoji} ${s.text}`;
+  if (s.kind === "emoji") return `${s.emoji} ملصق`;
+  if (s.kind === "image") return `🖼️ ${s.label}`;
+  return `${s.emoji} ${s.text}`;
 }

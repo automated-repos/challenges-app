@@ -64,3 +64,6 @@ $$;
 
 revoke all on function public.set_ready(uuid, boolean) from public, anon;
 grant execute on function public.set_ready(uuid, boolean) to authenticated;
+
+-- تحديث قائمة الدوال في واجهة Supabase حتى تظهر الدوال الجديدة فوراً
+notify pgrst, 'reload schema';

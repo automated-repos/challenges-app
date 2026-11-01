@@ -82,3 +82,6 @@ $$;
 
 revoke all on function public.send_message(uuid, text, text) from public, anon;
 grant execute on function public.send_message(uuid, text, text) to authenticated;
+
+-- تحديث قائمة الدوال في واجهة Supabase حتى تظهر الدوال الجديدة فوراً
+notify pgrst, 'reload schema';

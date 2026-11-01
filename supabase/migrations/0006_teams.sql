@@ -241,3 +241,6 @@ grant execute on function
   public.join_team(uuid, int),
   public.shuffle_teams(uuid)
 to authenticated;
+
+-- تحديث قائمة الدوال في واجهة Supabase حتى تظهر الدوال الجديدة فوراً
+notify pgrst, 'reload schema';
