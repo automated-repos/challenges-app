@@ -34,6 +34,8 @@ interface Match {
   finished_at: string | null;
   questions: number;
   categories: string[] | null;
+  /** نوع اللعبة (قد يغيب في قواعد بيانات قديمة لم يُشغَّل فيها 0012) */
+  game?: "quiz" | "stop";
   players: MatchPlayer[];
 }
 
@@ -277,7 +279,7 @@ function MatchCard({ match, userId }: { match: Match; userId: string }) {
           </p>
           <p className="text-xs text-indigo-300">
             {match.finished_at ? dateFmt.format(new Date(match.finished_at)) : "—"} • {players.length} لاعبين •{" "}
-            {match.questions} أسئلة
+            {match.game === "stop" ? `🚌 أتوبيس كومبليت • ${match.questions} جولات` : `${match.questions} أسئلة`}
             {me && <> • مركزك: {me.place}</>}
           </p>
         </div>
@@ -287,7 +289,8 @@ function MatchCard({ match, userId }: { match: Match; userId: string }) {
       {open && (
         <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
           <p className="text-xs text-indigo-300">
-            المجالات: {match.categories?.length ? match.categories.join("، ") : "كل المجالات"}
+            {match.game === "stop" ? "الخانات" : "المجالات"}:{" "}
+            {match.categories?.length ? match.categories.join("، ") : "كل المجالات"}
           </p>
           {players.map((p) => (
             <div

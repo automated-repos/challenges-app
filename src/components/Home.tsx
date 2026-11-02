@@ -29,9 +29,7 @@ function HomeInner() {
       <header className="mb-8 text-center">
         <div className="text-6xl">🏆</div>
         <h1 className="mt-2 text-4xl font-black">تحدي الأسئلة</h1>
-        <p className="mt-2 text-indigo-200">
-          العب مع أصدقائك بالضغط (الأسرع يجيب) أو بالأدوار، فردياً أو في فرق.
-        </p>
+        <p className="mt-2 text-indigo-200">العب مع أصدقائك بالضغط (الأسرع يجيب) أو بالأدوار، فردياً أو في فرق.</p>
         <div className="mt-4 flex justify-center">
           <InstallButton />
         </div>
@@ -51,23 +49,23 @@ function HomeInner() {
             <span>🏆 لوحة الشرف وسجل المسابقات</span>
             <span className="text-amber-200">←</span>
           </Link>
-      <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/5 p-1">
-        {(["join", "create"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`rounded-xl py-2.5 font-bold transition ${
-              tab === t ? "bg-indigo-500 text-white shadow" : "text-indigo-200 hover:bg-white/5"
-            }`}
-          >
-            {t === "join" ? "انضمام لمسابقة" : "إنشاء مسابقة"}
-          </button>
-        ))}
-      </div>
+          <div className="grid grid-cols-2 gap-2 rounded-2xl bg-white/5 p-1">
+            {(["join", "create"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setTab(t)}
+                className={`rounded-xl py-2.5 font-bold transition ${
+                  tab === t ? "bg-indigo-500 text-white shadow" : "text-indigo-200 hover:bg-white/5"
+                }`}
+              >
+                {t === "join" ? "انضمام لمسابقة" : "إنشاء مسابقة"}
+              </button>
+            ))}
+          </div>
 
-      <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
-        {tab === "join" ? <JoinForm /> : <CreateForm />}
-      </section>
+          <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
+            {tab === "join" ? <JoinForm /> : <CreateTab />}
+          </section>
         </div>
       )}
     </main>
@@ -85,7 +83,9 @@ function JoinForm() {
     setBusy(true);
     setError("");
     try {
-      const { error } = await getSupabase().rpc("join_room", { p_code: code.trim() });
+      const { error } = await getSupabase().rpc("join_room", {
+        p_code: code.trim(),
+      });
       if (error) throw error;
       router.push(`/room/?code=${code.trim()}`);
     } catch (e) {
@@ -115,6 +115,142 @@ function JoinForm() {
   );
 }
 
+/** اختيار نوع اللعبة ثم إعداداتها */
+function CreateTab() {
+  const [game, setGame] = useState<"quiz" | "stop">("quiz");
+  return (
+    <div className="space-y-5">
+      <div className="grid grid-cols-2 gap-2">
+        {(
+          [
+            { id: "quiz", icon: "🧠", name: "مسابقة أسئلة" },
+            { id: "stop", icon: "🚌", name: "أتوبيس كومبليت" },
+          ] as const
+        ).map((g) => (
+          <button
+            key={g.id}
+            type="button"
+            onClick={() => setGame(g.id)}
+            className={`rounded-2xl border px-3 py-3 font-bold transition ${
+              game === g.id
+                ? "border-indigo-400 bg-indigo-500/30 ring-2 ring-indigo-400"
+                : "border-white/15 bg-white/5 hover:bg-white/10"
+            }`}
+          >
+            <span className="block text-3xl">{g.icon}</span>
+            {g.name}
+          </button>
+        ))}
+      </div>
+      {game === "quiz" ? <CreateForm /> : <StopForm />}
+    </div>
+  );
+}
+
+// الخانات الشائعة في أتوبيس كومبليت (يمكن إضافة خانات خاصة)
+const STOP_PRESETS = [
+  "اسم",
+  "حيوان",
+  "نبات",
+  "جماد",
+  "بلد",
+  "مدينة",
+  "أكلة",
+  "مهنة",
+  "لون",
+  "ماركة",
+  "مشهور",
+  "فيلم أو مسلسل",
+];
+const STOP_DEFAULT = ["اسم", "حيوان", "نبات", "جماد", "بلد"];
+
+function StopForm() {
+  const router = useRouter();
+  const [cats, setCats] = useState<string[]>(STOP_DEFAULT);
+  const [custom, setCustom] = useState("");
+  const [rounds, setRounds] = useState(5);
+  const [seconds, setSeconds] = useState(90);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  function toggle(c: string) {
+    setCats((s) => (s.includes(c) ? s.filter((x) => x !== c) : s.length >= 8 ? s : [...s, c]));
+  }
+
+  function addCustom() {
+    const c = custom.trim().slice(0, 20);
+    if (c && !cats.includes(c) && cats.length < 8) setCats([...cats, c]);
+    setCustom("");
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_stop_room", {
+        p_categories: cats,
+        p_rounds: rounds,
+        p_seconds: seconds,
+      });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        يظهر حرف عشوائي، وكل لاعب يكتب كلمة تبدأ به في كل خانة. أول من يُكمل يضغط <b>ستوب!</b> ثم يصوّت الجميع على
+        الكلمات الخاطئة. الكلمة الوحيدة في خانتها = 20، غير المكررة = 10، المكررة = 5.
+      </p>
+      <Field label={`الخانات (${cats.length} من 3 إلى 8)`}>
+        <div className="flex flex-wrap gap-2">
+          {[...STOP_PRESETS, ...cats.filter((c) => !STOP_PRESETS.includes(c))].map((c) => (
+            <Chip key={c} active={cats.includes(c)} onClick={() => toggle(c)}>
+              {c}
+            </Chip>
+          ))}
+        </div>
+        <div className="mt-2 flex gap-2">
+          <input
+            value={custom}
+            onChange={(e) => setCustom(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                addCustom();
+              }
+            }}
+            maxLength={20}
+            placeholder="خانة أخرى..."
+            className="input py-2"
+          />
+          <button
+            type="button"
+            onClick={addCustom}
+            disabled={!custom.trim() || cats.length >= 8}
+            className="btn-ghost shrink-0"
+          >
+            إضافة
+          </button>
+        </div>
+      </Field>
+      <div className="grid grid-cols-2 gap-4">
+        <NumberField label="عدد الجولات" value={rounds} onChange={setRounds} min={1} max={15} />
+        <NumberField label="ثواني كل جولة" value={seconds} onChange={setSeconds} min={30} max={300} />
+      </div>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy || cats.length < 3} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
 function CreateForm() {
   const router = useRouter();
   const [categories, setCategories] = useState<Category[] | null>(null);
@@ -126,7 +262,7 @@ function CreateForm() {
   const [pointsWrong, setPointsWrong] = useState(5);
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [playMode, setPlayMode] = useState<"buzzer" | "turns">("buzzer");
-  const [turnPick, setTurnPick] = useState<"random" | "choose">("random");
+  const [turnPick, setTurnPick] = useState<"random" | "choose" | "same">("random");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -214,7 +350,16 @@ function CreateForm() {
             <Chip active={turnPick === "choose"} onClick={() => setTurnPick("choose")}>
               🗂️ صاحب الدور يختار المجال
             </Chip>
+            <Chip active={turnPick === "same"} onClick={() => setTurnPick("same")}>
+              🎯 نفس المجال للجميع في كل جولة
+            </Chip>
           </div>
+        )}
+        {playMode === "turns" && turnPick === "same" && (
+          <p className="mt-2 text-xs text-indigo-300">
+            في كل جولة يُختار مجال عشوائي، ويجيب كل فريق (أو لاعب) عن سؤال مختلف من نفس المجال. عدد الأسئلة يُضبط
+            ليتساوى الجميع.
+          </p>
         )}
       </Field>
 
@@ -232,13 +377,25 @@ function CreateForm() {
         <NumberField label="عدد الأسئلة" value={total} onChange={setTotal} min={1} max={100} />
         {playMode === "buzzer" ? (
           <>
-            <NumberField label="ثواني انتظار الضغط" value={questionSeconds} onChange={setQuestionSeconds} min={5} max={120} />
+            <NumberField
+              label="ثواني انتظار الضغط"
+              value={questionSeconds}
+              onChange={setQuestionSeconds}
+              min={5}
+              max={120}
+            />
             <NumberField label="ثواني الإجابة" value={answerSeconds} onChange={setAnswerSeconds} min={3} max={60} />
           </>
         ) : (
           <NumberField label="ثواني كل دور" value={questionSeconds} onChange={setQuestionSeconds} min={5} max={120} />
         )}
-        <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={1000} />
+        <NumberField
+          label="نقاط الإجابة الصحيحة"
+          value={pointsCorrect}
+          onChange={setPointsCorrect}
+          min={0}
+          max={1000}
+        />
         <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={1000} />
       </div>
 

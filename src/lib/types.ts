@@ -1,4 +1,12 @@
-export type RoomStatus = "lobby" | "picking" | "question" | "reveal" | "finished";
+export type RoomStatus =
+  | "lobby"
+  | "picking"
+  | "question"
+  | "reveal"
+  | "writing" // أتوبيس كومبليت: الكتابة
+  | "voting" // أتوبيس كومبليت: التصويت
+  | "round_end" // أتوبيس كومبليت: نتيجة الجولة
+  | "finished";
 
 export type GameEvent =
   | { type: "buzz"; player: string }
@@ -33,8 +41,8 @@ export interface Room {
   difficulty: Difficulty | null;
   /** بالضغط (الأسرع يجيب) أو بالأدوار */
   play_mode: "buzzer" | "turns";
-  /** في الأدوار: سؤال عشوائي أو صاحب الدور يختار المجال */
-  turn_pick: "random" | "choose";
+  /** في الأدوار: سؤال عشوائي، أو صاحب الدور يختار المجال، أو نفس المجال العشوائي للجميع في كل جولة */
+  turn_pick: "random" | "choose" | "same";
   turn_order: string[];
   /** صاحب الدور الحالي (في وضع الأدوار) */
   turn_player: string | null;
@@ -42,6 +50,11 @@ export interface Room {
   pick_deadline: string | null;
   /** عدد الفرق في وضع الفرق */
   team_count: number | null;
+  /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت */
+  game: "quiz" | "stop";
+  /** أتوبيس كومبليت: الخانات وحرف الجولة */
+  stop_categories: string[] | null;
+  stop_letter: string | null;
   updated_at: string;
 }
 

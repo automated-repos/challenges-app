@@ -51,7 +51,11 @@ export function Lobby({
     // على الهاتف: قائمة المشاركة (واتساب وغيره). على الكمبيوتر: نسخ الرابط
     if (navigator.share) {
       try {
-        await navigator.share({ title: "تحدي الأسئلة", text: `انضم لمسابقتي! رمز الغرفة: ${room.code}`, url });
+        await navigator.share({
+          title: "تحدي الأسئلة",
+          text: `انضم لمسابقتي! رمز الغرفة: ${room.code}`,
+          url,
+        });
         return;
       } catch (e) {
         if (e instanceof DOMException && e.name === "AbortError") return; // المستخدم أغلق القائمة
@@ -116,29 +120,42 @@ export function Lobby({
         </div>
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
-          <span>{room.total_questions} سؤال</span>
-          <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
-          <span>
-            {room.play_mode === "turns"
-              ? room.turn_pick === "choose"
-                ? "🔄 بالأدوار • صاحب الدور يختار المجال"
-                : "🔄 بالأدوار • سؤال عشوائي"
-              : "🔔 بالضغط"}
-          </span>
-          <span>+{room.points_correct} للصحيحة</span>
-          <span>−{room.points_wrong} للخاطئة</span>
-          {room.play_mode === "turns" ? (
-            <span>{room.question_seconds} ث لكل دور</span>
+          {room.game === "stop" ? (
+            <>
+              <span>🚌 أتوبيس كومبليت</span>
+              <span>{room.total_questions} جولات</span>
+              <span>{room.question_seconds} ث لكل جولة</span>
+              <span>الخانات: {(room.stop_categories ?? []).join("، ")}</span>
+            </>
           ) : (
             <>
-              <span>{room.question_seconds} ث للضغط</span>
-              <span>{room.answer_seconds} ث للإجابة</span>
+              <span>{room.total_questions} سؤال</span>
+              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+              <span>
+                {room.play_mode === "turns"
+                  ? room.turn_pick === "choose"
+                    ? "🔄 بالأدوار • صاحب الدور يختار المجال"
+                    : room.turn_pick === "same"
+                      ? "🔄 بالأدوار • 🎯 نفس المجال للجميع في كل جولة"
+                      : "🔄 بالأدوار • سؤال عشوائي"
+                  : "🔔 بالضغط"}
+              </span>
+              <span>+{room.points_correct} للصحيحة</span>
+              <span>−{room.points_wrong} للخاطئة</span>
+              {room.play_mode === "turns" ? (
+                <span>{room.question_seconds} ث لكل دور</span>
+              ) : (
+                <>
+                  <span>{room.question_seconds} ث للضغط</span>
+                  <span>{room.answer_seconds} ث للإجابة</span>
+                </>
+              )}
             </>
           )}
         </div>
       </section>
 
-      {isHost && <TeamSettings room={room} busy={busy} run={run} />}
+      {isHost && room.game !== "stop" && <TeamSettings room={room} busy={busy} run={run} />}
 
       {teamMode ? (
         <LobbyTeams room={room} players={players} userId={userId} busy={busy} run={run} />
