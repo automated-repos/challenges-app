@@ -1,5 +1,6 @@
 // يصدر "تذكرة دخول" للغرفة الصوتية في LiveKit
-// لا تُعطى التذكرة إلا للاعب مسجّل دخوله وموجود فعلاً في الغرفة
+// لا تُعطى التذكرة إلا للاعب مسجّل دخوله وموجود فعلاً في الغرفة.
+// في وضع الفرق أثناء اللعب، تكون التذكرة لغرفة صوت فريقه فقط.
 // النشر: supabase functions deploy voice-token --no-verify-jwt
 // الأسرار: supabase secrets set LIVEKIT_URL=... LIVEKIT_API_KEY=... LIVEKIT_API_SECRET=...
 
@@ -48,11 +49,18 @@ Deno.serve(async (req) => {
 
   const { data: player } = await sb
     .from("players")
-    .select("name, avatar")
+    .select("name, avatar, team")
     .eq("room_id", roomId)
     .eq("user_id", userId)
     .maybeSingle();
   if (!player) return json({ error: "لست عضواً في هذه الغرفة" }, 403);
+
+  // في وضع الفرق أثناء اللعب: كل فريق في غرفة صوتية خاصة به.
+  // في الانتظار والنتائج (أو بدون فرق): غرفة واحدة للجميع.
+  const { data: room } = await sb.from("rooms").select("team_size, status").eq("id", roomId).maybeSingle();
+  const playing = room && room.status !== "lobby" && room.status !== "finished";
+  const team = room?.team_size != null && playing && player.team != null ? (player.team as number) : null;
+  const channel = team != null ? `room-${roomId}-team-${team}` : `room-${roomId}`;
 
   const at = new AccessToken(apiKey, apiSecret, {
     identity: userId,
@@ -61,12 +69,12 @@ Deno.serve(async (req) => {
     ttl: "3h",
   });
   at.addGrant({
-    room: `room-${roomId}`,
+    room: channel,
     roomJoin: true,
     canPublish: true,
     canSubscribe: true,
     canPublishData: false,
   });
 
-  return json({ token: await at.toJwt(), url: livekitUrl });
+  return json({ token: await at.toJwt(), url: livekitUrl, team });
 });

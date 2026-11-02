@@ -101,7 +101,9 @@ export function Lobby({
         : "";
   // اللعب منفرداً لا يُحتسب، فلا تبدأ المسابقة إلا بلاعبين على الأقل (نفس شرط القاعدة)
   const alone = players.length < 2;
-  const canStart = !alone && allReady && !teamBlock;
+  // لودو: 4 لاعبين على الأكثر (نفس شرط القاعدة)
+  const tooMany = room.game === "ludo" && players.length > 4;
+  const canStart = !alone && !tooMany && allReady && !teamBlock;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -120,7 +122,13 @@ export function Lobby({
         </div>
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
-          {room.game === "stop" ? (
+          {room.game === "ludo" ? (
+            <>
+              <span>🎲 لودو</span>
+              <span>من 2 إلى 4 لاعبين</span>
+              <span>{room.question_seconds} ث لكل حركة</span>
+            </>
+          ) : room.game === "stop" ? (
             <>
               <span>🚌 أتوبيس كومبليت</span>
               <span>{room.total_questions} جولات</span>
@@ -155,7 +163,7 @@ export function Lobby({
         </div>
       </section>
 
-      {isHost && room.game !== "stop" && <TeamSettings room={room} busy={busy} run={run} />}
+      {isHost && room.game === "quiz" && <TeamSettings room={room} busy={busy} run={run} />}
 
       {teamMode ? (
         <LobbyTeams room={room} players={players} userId={userId} busy={busy} run={run} />
@@ -204,6 +212,11 @@ export function Lobby({
           <button onClick={start} disabled={busy || !canStart} className="btn-primary w-full py-4 text-xl">
             {busy ? "جارٍ..." : "🚀 ابدأ المسابقة"}
           </button>
+          {tooMany && (
+            <p className="text-center text-sm text-amber-200">
+              🎲 لودو من 2 إلى 4 لاعبين فقط، وفي الغرفة {players.length}.
+            </p>
+          )}
           {alone && (
             <p className="text-center text-sm text-amber-200">
               👥 تحتاج لاعباً آخر على الأقل للبدء. شارك رمز الغرفة مع أصدقائك.

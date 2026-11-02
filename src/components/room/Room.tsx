@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useState } from "react";
 import { errorMessage, isConfigured } from "@/lib/supabase";
 import { parseRoomCode } from "@/lib/roomCode";
-import type { Profile } from "@/lib/types";
+import type { Player, Profile, Room } from "@/lib/types";
 import { SetupNotice } from "../SetupNotice";
 import { Avatar, Center, ErrorBox } from "../ui";
 import { useAuth } from "../auth/useAuth";
@@ -15,9 +15,11 @@ import { Lobby } from "./Lobby";
 import { QuestionView } from "./QuestionView";
 import { PickCategory } from "./PickCategory";
 import { StopGame } from "./StopGame";
+import { LudoGame } from "./LudoGame";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 import { VoiceChat } from "./VoiceChat";
+import { teamInfo } from "@/lib/teams";
 import { RoomChat } from "./RoomChat";
 
 export function RoomPage() {
@@ -89,9 +91,16 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
         </div>
       </header>
 
-      <VoiceChat roomId={room.id} />
+      <VoiceChat roomId={room.id} {...voiceChannel(room, players, userId)} />
 
       {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
+
+      {room.status === "playing" && room.ludo && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <LudoGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
+        </div>
+      )}
 
       {(room.status === "writing" || room.status === "voting" || room.status === "round_end") && (
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
@@ -162,4 +171,15 @@ function JoinGate({ code, profile, onJoin }: { code: string; profile: Profile; o
       </div>
     </main>
   );
+}
+
+/** غرفة الصوت: في الفرق أثناء اللعب لكل فريق غرفته، وإلا غرفة واحدة للجميع (نفس منطق دالة voice-token) */
+function voiceChannel(room: Room, players: Player[], userId: string): { channel: string; label: string } {
+  const team = players.find((p) => p.user_id === userId)?.team ?? null;
+  const playing = room.status !== "lobby" && room.status !== "finished";
+  if (room.team_size != null && playing && team != null) {
+    const info = teamInfo(team);
+    return { channel: `team-${team}`, label: `صوت ${info.name} ${info.emoji}` };
+  }
+  return { channel: "all", label: "صوت الغرفة" };
 }

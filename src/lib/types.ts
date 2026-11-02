@@ -6,6 +6,7 @@ export type RoomStatus =
   | "writing" // أتوبيس كومبليت: الكتابة
   | "voting" // أتوبيس كومبليت: التصويت
   | "round_end" // أتوبيس كومبليت: نتيجة الجولة
+  | "playing" // لودو
   | "finished";
 
 export type GameEvent =
@@ -50,12 +51,37 @@ export interface Room {
   pick_deadline: string | null;
   /** عدد الفرق في وضع الفرق */
   team_count: number | null;
-  /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت */
-  game: "quiz" | "stop";
+  /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت أو لودو */
+  game: "quiz" | "stop" | "ludo";
+  /** حالة لودو (انظر 0014_ludo.sql) */
+  ludo: LudoState | null;
   /** أتوبيس كومبليت: الخانات وحرف الجولة */
   stop_categories: string[] | null;
   stop_letter: string | null;
   updated_at: string;
+}
+
+export interface LudoState {
+  players: string[];
+  /** لون كل لاعب: 0 أحمر، 1 أخضر، 2 أصفر، 3 أزرق */
+  colors: number[];
+  /** موقع كل قطعة: -1 في البيت، 0..50 على المسار من نقطة بدايته، 51..55 ممر النهاية، 56 وصلت */
+  tokens: number[][];
+  turn: number;
+  dice: number | null;
+  phase: "roll" | "move" | "done";
+  sixes: number;
+  seq: number;
+  winner?: string;
+  last: {
+    type: "roll" | "move" | "no_move" | "three_sixes";
+    player: string;
+    dice: number;
+    token?: number;
+    from?: number;
+    to?: number;
+    captured?: number;
+  } | null;
 }
 
 export interface Player {

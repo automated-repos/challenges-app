@@ -117,14 +117,15 @@ function JoinForm() {
 
 /** اختيار نوع اللعبة ثم إعداداتها */
 function CreateTab() {
-  const [game, setGame] = useState<"quiz" | "stop">("quiz");
+  const [game, setGame] = useState<"quiz" | "stop" | "ludo">("quiz");
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         {(
           [
             { id: "quiz", icon: "🧠", name: "مسابقة أسئلة" },
             { id: "stop", icon: "🚌", name: "أتوبيس كومبليت" },
+            { id: "ludo", icon: "🎲", name: "لودو" },
           ] as const
         ).map((g) => (
           <button
@@ -142,8 +143,45 @@ function CreateTab() {
           </button>
         ))}
       </div>
-      {game === "quiz" ? <CreateForm /> : <StopForm />}
+      {game === "quiz" ? <CreateForm /> : game === "stop" ? <StopForm /> : <LudoForm />}
     </div>
+  );
+}
+
+function LudoForm() {
+  const router = useRouter();
+  const [seconds, setSeconds] = useState(20);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_ludo_room", { p_seconds: seconds });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        من 2 إلى 4 لاعبين، لكل لاعب 4 قطع. القطعة تخرج من البيت بالـ 6، والوقوف على قطعة خصم يرجعها لبيتها (إلا في
+        مربعات ★). الـ 6 أو الأكل أو الوصول = رمية إضافية. أول من يُدخل قطعه الأربع يفوز.
+        <br />
+        النقاط: 10 لكل قطعة تصل، 5 لكل قطعة تأكلها، 20 للفائز.
+      </p>
+      <NumberField label="ثواني كل حركة (بعدها يُلعب عن اللاعب تلقائياً)" value={seconds} onChange={setSeconds} min={10} max={60} />
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
   );
 }
 

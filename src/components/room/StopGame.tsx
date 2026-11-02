@@ -53,7 +53,7 @@ export function StopGame({
 }) {
   const now = useServerNow(offset);
   const left = msLeft(room.question_deadline, now);
-  const total = room.status === "writing" ? room.question_seconds : room.status === "voting" ? 45 : 10;
+  const total = room.status === "writing" ? room.question_seconds : 10;
 
   return (
     <section className="space-y-4">
@@ -74,9 +74,20 @@ export function StopGame({
           </p>
         </div>
         {isHost && <HostButtons room={room} call={call} />}
-        <div className="w-full">
-          <TimerBar seconds={left} total={total} />
-        </div>
+        {/* التصويت بلا وقت: صاحب الغرفة ينهيه */}
+        {room.status === "voting" ? (
+          isHost ? (
+            <button onClick={() => call("skip_question").catch(() => {})} className="btn-primary w-full py-3 text-lg">
+              ✅ إنهاء التصويت وحساب النقاط
+            </button>
+          ) : (
+            <p className="w-full text-center text-sm text-indigo-200">⏳ التصويت مفتوح حتى ينهيه صاحب الغرفة</p>
+          )
+        ) : (
+          <div className="w-full">
+            <TimerBar seconds={left} total={total} />
+          </div>
+        )}
       </header>
 
       {room.status === "writing" && (

@@ -151,6 +151,9 @@ function newer(prev: Room | null, next: Room): Room {
 }
 
 export function currentDeadline(room: Room): number | null {
+  if (room.game === "ludo") {
+    return room.status === "playing" && room.question_deadline ? Date.parse(room.question_deadline) : null;
+  }
   if (room.game === "stop") {
     const active = room.status === "writing" || room.status === "voting" || room.status === "round_end";
     return active && room.question_deadline ? Date.parse(room.question_deadline) : null;
