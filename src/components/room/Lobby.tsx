@@ -95,7 +95,9 @@ export function Lobby({
       : teamCount < 2
         ? "يجب أن يكون هناك فريقان على الأقل"
         : "";
-  const canStart = allReady && !teamBlock;
+  // اللعب منفرداً لا يُحتسب، فلا تبدأ المسابقة إلا بلاعبين على الأقل (نفس شرط القاعدة)
+  const alone = players.length < 2;
+  const canStart = !alone && allReady && !teamBlock;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -172,6 +174,11 @@ export function Lobby({
           <button onClick={start} disabled={busy || !canStart} className="btn-primary w-full py-4 text-xl">
             {busy ? "جارٍ..." : "🚀 ابدأ المسابقة"}
           </button>
+          {alone && (
+            <p className="text-center text-sm text-amber-200">
+              👥 تحتاج لاعباً آخر على الأقل للبدء. شارك رمز الغرفة مع أصدقائك.
+            </p>
+          )}
           {!allReady && (
             <p className="text-center text-sm text-indigo-200">
               ⏳ بانتظار جاهزية الجميع ({readyCount} من {contestants.length})

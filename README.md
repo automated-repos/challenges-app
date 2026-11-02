@@ -17,8 +17,9 @@
 7. [`supabase/migrations/0007_gifts.sql`](supabase/migrations/0007_gifts.sql): إهداء النقاط
 8. [`supabase/migrations/0008_sticker_cost.sql`](supabase/migrations/0008_sticker_cost.sql): ملصقات تخصم نقاطاً
 9. [`supabase/migrations/0009_difficulty.sql`](supabase/migrations/0009_difficulty.sql): مستوى الصعوبة
-10. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
-11. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
+10. [`supabase/migrations/0010_no_solo.sql`](supabase/migrations/0010_no_solo.sql): منع اللعب منفرداً (لا تبدأ مسابقة إلا بلاعبين)
+11. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+12. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
