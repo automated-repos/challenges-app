@@ -41,6 +41,9 @@ export function QuestionView({
   // في وضع الفرق: من انضم بعد البدء بدون فريق يشاهد فقط
   const spectator = room.team_size != null && players.find((p) => p.user_id === userId)?.team == null;
   const lockedOut = spectator || room.locked_out.includes(userId);
+  // بالأدوار: صاحب الدور يجيب مباشرة، ووقته هو وقت السؤال كاملاً
+  const turns = room.play_mode === "turns";
+  const answerTotal = turns ? room.question_seconds : room.answer_seconds;
   const nameOf = (id?: string | null) => {
     const p = players.find((x) => x.user_id === id);
     return p ? `${p.avatar} ${p.name}` : "متسابق";
@@ -190,7 +193,7 @@ export function QuestionView({
                 <Status
                   tone="amber"
                   seconds={answerLeft}
-                  total={room.answer_seconds}
+                  total={answerTotal}
                 >
                   🎯 دورك! اختر الإجابة الصحيحة
                 </Status>
@@ -198,9 +201,9 @@ export function QuestionView({
                 <Status
                   tone="amber"
                   seconds={answerLeft}
-                  total={room.answer_seconds}
+                  total={answerTotal}
                 >
-                  🔔 {nameOf(room.buzzed_by)} يجيب الآن...
+                  {turns ? "🔄 دور" : "🔔"} {nameOf(room.buzzed_by)} {turns ? "" : "يجيب الآن..."}
                 </Status>
               ) : lockedOut ? (
                 <Status
@@ -294,7 +297,7 @@ function Status({
   );
 }
 
-function TimerBar({ seconds: ms, total }: { seconds: number; total: number }) {
+export function TimerBar({ seconds: ms, total }: { seconds: number; total: number }) {
   const pct = Math.max(0, Math.min(100, (ms / (total * 1000)) * 100));
   const secs = Math.ceil(ms / 1000);
   return (
@@ -312,12 +315,12 @@ function TimerBar({ seconds: ms, total }: { seconds: number; total: number }) {
   );
 }
 
-function msLeft(deadline: string | null, now: number) {
+export function msLeft(deadline: string | null, now: number) {
   return deadline ? Math.max(0, Date.parse(deadline) - now) : 0;
 }
 
 /** الوقت الحالي حسب ساعة الخادم، يتحدث 5 مرات في الثانية */
-function useServerNow(offset: RefObject<number>) {
+export function useServerNow(offset: RefObject<number>) {
   const [now, setNow] = useState(0);
   useEffect(() => {
     const update = () => setNow(Date.now() + offset.current);

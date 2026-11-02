@@ -13,6 +13,7 @@ import { AuthForm } from "../auth/AuthForm";
 import { useRoom } from "./useRoom";
 import { Lobby } from "./Lobby";
 import { QuestionView } from "./QuestionView";
+import { PickCategory } from "./PickCategory";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 import { VoiceChat } from "./VoiceChat";
@@ -91,17 +92,21 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
 
       {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
 
-      {(room.status === "question" || room.status === "reveal") && (
+      {(room.status === "question" || room.status === "reveal" || room.status === "picking") && (
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <QuestionView
-            key={room.current_index}
-            room={room}
-            players={players}
-            userId={userId}
-            isHost={isHost}
-            offset={offset}
-            call={call}
-          />
+          {room.status === "picking" ? (
+            <PickCategory room={room} players={players} userId={userId} offset={offset} call={call} />
+          ) : (
+            <QuestionView
+              key={room.current_index}
+              room={room}
+              players={players}
+              userId={userId}
+              isHost={isHost}
+              offset={offset}
+              call={call}
+            />
+          )}
           <Scoreboard players={players} userId={userId} room={room} call={call} />
         </div>
       )}

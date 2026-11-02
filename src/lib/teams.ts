@@ -51,9 +51,10 @@ export function rankTeams(players: Player[]): TeamStanding[] {
   });
 }
 
-/** عدد الفرق التي تظهر في غرفة الانتظار: ما يكفي الجميع، وفريقان على الأقل */
-export function visibleTeamCount(players: Player[], teamSize: number): number {
-  const needed = Math.ceil(players.length / teamSize);
+/** عدد الفرق التي تظهر في غرفة الانتظار: العدد الذي اختاره منشئ الغرفة، وإلا ما يكفي الجميع */
+export function visibleTeamCount(players: Player[], teamSize: number, teamCount: number | null): number {
   const used = Math.max(0, ...players.map((p) => p.team ?? 0));
+  if (teamCount) return Math.min(MAX_TEAMS, Math.max(teamCount, used));
+  const needed = Math.ceil(players.length / teamSize);
   return Math.min(MAX_TEAMS, Math.max(2, needed, used));
 }

@@ -11,6 +11,7 @@ import { useAuth } from "./auth/useAuth";
 import { AuthForm } from "./auth/AuthForm";
 import { ProfileBar } from "./auth/ProfileBar";
 import { Center, ErrorBox, Field } from "./ui";
+import { InstallButton } from "./InstallApp";
 
 export function Home() {
   if (!isConfigured) return <SetupNotice />;
@@ -29,8 +30,11 @@ function HomeInner() {
         <div className="text-6xl">🏆</div>
         <h1 className="mt-2 text-4xl font-black">تحدي الأسئلة</h1>
         <p className="mt-2 text-indigo-200">
-          من يضغط الزر أولاً يجيب. الإجابة الخاطئة تخصم نقاطاً وتفتح السؤال للباقين.
+          العب مع أصدقائك بالضغط (الأسرع يجيب) أو بالأدوار، فردياً أو في فرق.
         </p>
+        <div className="mt-4 flex justify-center">
+          <InstallButton />
+        </div>
       </header>
 
       {!auth.profile ? (
@@ -121,6 +125,8 @@ function CreateForm() {
   const [pointsCorrect, setPointsCorrect] = useState(10);
   const [pointsWrong, setPointsWrong] = useState(5);
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [playMode, setPlayMode] = useState<"buzzer" | "turns">("buzzer");
+  const [turnPick, setTurnPick] = useState<"random" | "choose">("random");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -160,6 +166,8 @@ function CreateForm() {
         p_points_correct: pointsCorrect,
         p_points_wrong: pointsWrong,
         p_difficulty: difficulty,
+        p_play_mode: playMode,
+        p_turn_pick: turnPick,
       });
       if (error) throw error;
       router.push(`/room/?code=${data}`);
@@ -189,6 +197,27 @@ function CreateForm() {
         )}
       </Field>
 
+      <Field label="طريقة اللعب">
+        <div className="flex flex-wrap gap-2">
+          <Chip active={playMode === "buzzer"} onClick={() => setPlayMode("buzzer")}>
+            🔔 بالضغط: الأسرع يجيب
+          </Chip>
+          <Chip active={playMode === "turns"} onClick={() => setPlayMode("turns")}>
+            🔄 بالأدوار: كل لاعب في دوره
+          </Chip>
+        </div>
+        {playMode === "turns" && (
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Chip active={turnPick === "random"} onClick={() => setTurnPick("random")}>
+              🎲 سؤال عشوائي
+            </Chip>
+            <Chip active={turnPick === "choose"} onClick={() => setTurnPick("choose")}>
+              🗂️ صاحب الدور يختار المجال
+            </Chip>
+          </div>
+        )}
+      </Field>
+
       <Field label="مستوى الصعوبة">
         <div className="flex flex-wrap gap-2">
           {DIFFICULTIES.map((d) => (
@@ -201,8 +230,14 @@ function CreateForm() {
 
       <div className="grid grid-cols-2 gap-4">
         <NumberField label="عدد الأسئلة" value={total} onChange={setTotal} min={1} max={100} />
-        <NumberField label="ثواني انتظار الضغط" value={questionSeconds} onChange={setQuestionSeconds} min={5} max={120} />
-        <NumberField label="ثواني الإجابة" value={answerSeconds} onChange={setAnswerSeconds} min={3} max={60} />
+        {playMode === "buzzer" ? (
+          <>
+            <NumberField label="ثواني انتظار الضغط" value={questionSeconds} onChange={setQuestionSeconds} min={5} max={120} />
+            <NumberField label="ثواني الإجابة" value={answerSeconds} onChange={setAnswerSeconds} min={3} max={60} />
+          </>
+        ) : (
+          <NumberField label="ثواني كل دور" value={questionSeconds} onChange={setQuestionSeconds} min={5} max={120} />
+        )}
         <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={1000} />
         <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={1000} />
       </div>

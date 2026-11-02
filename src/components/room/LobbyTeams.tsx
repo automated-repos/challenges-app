@@ -9,27 +9,30 @@ type Run = (fn: string, args?: Record<string, unknown>) => void;
 
 const blur = (e: MouseEvent<HTMLButtonElement>) => e.currentTarget.blur();
 
-/** إعداد وضع اللعب (منشئ الغرفة فقط): فردي أو فرق من 2 أو 3 أو 4 */
+/** إعداد وضع اللعب (منشئ الغرفة فقط): فردي أو عدد الفرق. الفرق قد تكون غير متساوية، وبحد أقصى 4 لاعبين */
 export function TeamSettings({ room, busy, run }: { room: Room; busy: boolean; run: Run }) {
-  const options: { size: number | null; label: string }[] = [
-    { size: null, label: "👤 فردي" },
-    { size: 2, label: "فرق من 2" },
-    { size: 3, label: "فرق من 3" },
-    { size: 4, label: "فرق من 4" },
+  const current = room.team_size == null ? null : (room.team_count ?? 2);
+  const options: { count: number | null; label: string }[] = [
+    { count: null, label: "👤 فردي" },
+    { count: 2, label: "فريقان" },
+    { count: 3, label: "3 فرق" },
+    { count: 4, label: "4 فرق" },
+    { count: 5, label: "5 فرق" },
+    { count: 6, label: "6 فرق" },
   ];
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
       <h2 className="mb-3 font-bold">وضع اللعب</h2>
       <div className="flex flex-wrap gap-2">
         {options.map((o) => {
-          const active = room.team_size === o.size;
+          const active = current === o.count;
           return (
             <button
               key={o.label}
               disabled={busy || active}
               onClick={(e) => {
                 blur(e);
-                run("set_team_size", { p_size: o.size });
+                run("set_teams", { p_count: o.count });
               }}
               className={`rounded-xl px-4 py-2 text-sm font-semibold transition ${
                 active ? "bg-indigo-500 text-white" : "border border-white/15 bg-white/5 hover:bg-white/10"
@@ -54,7 +57,12 @@ export function TeamSettings({ room, busy, run }: { room: Room; busy: boolean; r
       </div>
       {room.team_size && (
         <p className="mt-2 text-xs text-indigo-300">
-          الإجابة الخاطئة تمنع الفريق كله من السؤال، والفائز هو الفريق صاحب أعلى مجموع نقاط.
+          الفرق لا يلزم أن تكون متساوية (حتى {room.team_size} لاعبين في الفريق). يمكنك نقل أي لاعب من القائمة بجانب
+          اسمه.{" "}
+          {room.play_mode === "turns"
+            ? "الأدوار تتناوب بين الفرق."
+            : "الإجابة الخاطئة تمنع الفريق كله من السؤال."}{" "}
+          الفائز هو الفريق صاحب أعلى مجموع نقاط.
         </p>
       )}
     </section>
@@ -76,7 +84,9 @@ export function LobbyTeams({
   run: Run;
 }) {
   const size = room.team_size!;
-  const count = visibleTeamCount(players, size);
+  const count = visibleTeamCount(players, size, room.team_count);
+  const isHost = room.host_id === userId;
+  const move = (user: string, team: number | null) => run("assign_team", { p_user: user, p_team: team });
   const myTeam = players.find((p) => p.user_id === userId)?.team ?? null;
   const unassigned = players.filter((p) => p.team == null);
   const byJoin = (a: Player, b: Player) => a.joined_at.localeCompare(b.joined_at);
@@ -90,7 +100,7 @@ export function LobbyTeams({
           </h3>
           <ul className="flex flex-wrap gap-2">
             {unassigned.sort(byJoin).map((p) => (
-              <Member key={p.user_id} p={p} room={room} userId={userId} />
+              <Member key={p.user_id} p={p} room={room} userId={userId} teams={isHost ? count : 0} onMove={move} />
             ))}
           </ul>
         </div>
@@ -117,7 +127,7 @@ export function LobbyTeams({
               </div>
               <ul className="min-h-10 space-y-1.5">
                 {members.map((p) => (
-                  <Member key={p.user_id} p={p} room={room} userId={userId} />
+                  <Member key={p.user_id} p={p} room={room} userId={userId} teams={isHost ? count : 0} onMove={move} />
                 ))}
                 {members.length === 0 && <li className="text-sm text-white/40">لا أحد بعد</li>}
               </ul>
@@ -141,7 +151,20 @@ export function LobbyTeams({
   );
 }
 
-function Member({ p, room, userId }: { p: Player; room: Room; userId: string }) {
+/** teams > 0: منشئ الغرفة يرى قائمة لنقل اللاعب إلى فريق آخر */
+function Member({
+  p,
+  room,
+  userId,
+  teams,
+  onMove,
+}: {
+  p: Player;
+  room: Room;
+  userId: string;
+  teams: number;
+  onMove: (user: string, team: number | null) => void;
+}) {
   const isHost = p.user_id === room.host_id;
   return (
     <li
@@ -158,6 +181,21 @@ function Member({ p, room, userId }: { p: Player; room: Room; userId: string }) 
         <span title={p.ready ? "جاهز" : "لم يجهز بعد"} className="text-sm">
           {p.ready ? "✅" : "⏳"}
         </span>
+      )}
+      {teams > 0 && (
+        <select
+          value={p.team ?? ""}
+          onChange={(e) => onMove(p.user_id, e.target.value ? Number(e.target.value) : null)}
+          title="نقل إلى فريق"
+          className="rounded-lg border border-white/15 bg-black/40 px-1 py-0.5 text-xs"
+        >
+          <option value="">بدون فريق</option>
+          {Array.from({ length: teams }, (_, i) => i + 1).map((t) => (
+            <option key={t} value={t}>
+              {teamInfo(t).emoji} {teamInfo(t).name}
+            </option>
+          ))}
+        </select>
       )}
     </li>
   );

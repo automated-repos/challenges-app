@@ -1,4 +1,4 @@
-export type RoomStatus = "lobby" | "question" | "reveal" | "finished";
+export type RoomStatus = "lobby" | "picking" | "question" | "reveal" | "finished";
 
 export type GameEvent =
   | { type: "buzz"; player: string }
@@ -31,6 +31,17 @@ export interface Room {
   team_size: number | null;
   /** مستوى صعوبة كل الأسئلة، أو null للمختلط */
   difficulty: Difficulty | null;
+  /** بالضغط (الأسرع يجيب) أو بالأدوار */
+  play_mode: "buzzer" | "turns";
+  /** في الأدوار: سؤال عشوائي أو صاحب الدور يختار المجال */
+  turn_pick: "random" | "choose";
+  turn_order: string[];
+  /** صاحب الدور الحالي (في وضع الأدوار) */
+  turn_player: string | null;
+  /** مهلة اختيار المجال */
+  pick_deadline: string | null;
+  /** عدد الفرق في وضع الفرق */
+  team_count: number | null;
   updated_at: string;
 }
 

@@ -118,10 +118,23 @@ export function Lobby({
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
           <span>{room.total_questions} سؤال</span>
           <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+          <span>
+            {room.play_mode === "turns"
+              ? room.turn_pick === "choose"
+                ? "🔄 بالأدوار • صاحب الدور يختار المجال"
+                : "🔄 بالأدوار • سؤال عشوائي"
+              : "🔔 بالضغط"}
+          </span>
           <span>+{room.points_correct} للصحيحة</span>
           <span>−{room.points_wrong} للخاطئة</span>
-          <span>{room.question_seconds} ث للضغط</span>
-          <span>{room.answer_seconds} ث للإجابة</span>
+          {room.play_mode === "turns" ? (
+            <span>{room.question_seconds} ث لكل دور</span>
+          ) : (
+            <>
+              <span>{room.question_seconds} ث للضغط</span>
+              <span>{room.answer_seconds} ث للإجابة</span>
+            </>
+          )}
         </div>
       </section>
 

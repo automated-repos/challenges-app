@@ -156,6 +156,7 @@ export function currentDeadline(room: Room): number | null {
     if (room.question_deadline) return Date.parse(room.question_deadline);
   }
   if (room.status === "reveal" && room.reveal_until) return Date.parse(room.reveal_until);
+  if (room.status === "picking" && room.pick_deadline) return Date.parse(room.pick_deadline);
   return null;
 }
 
