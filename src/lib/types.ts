@@ -52,9 +52,11 @@ export interface Room {
   /** عدد الفرق في وضع الفرق */
   team_count: number | null;
   /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت أو لودو */
-  game: "quiz" | "stop" | "ludo";
+  game: "quiz" | "stop" | "ludo" | "chess";
   /** حالة لودو (انظر 0016_ludo_quiz.sql) */
   ludo: LudoState | null;
+  /** حالة الشطرنج (انظر 0019_chess.sql) */
+  chess: ChessState | null;
   /** أتوبيس كومبليت: الخانات وحرف الجولة */
   stop_categories: string[] | null;
   stop_letter: string | null;
@@ -102,6 +104,43 @@ export interface LudoState {
   seq: number;
   last: LudoEvent | null;
   log: LudoEvent[];
+}
+
+export type ChessColor = "w" | "b";
+
+export interface ChessEvent {
+  type: "move" | "attack" | "captured" | "cancelled";
+  by: ChessColor;
+  san: string;
+  piece?: string;
+  captured?: string | null;
+  end?: string | null;
+}
+
+/** حالة الشطرنج (انظر 0019_chess.sql) */
+export interface ChessState {
+  fen: string;
+  sides: Record<ChessColor, { team: number | null; captain: string }>;
+  phase: "move" | "question" | "reveal" | "done";
+  /** الحركة المعلقة على الأسئلة */
+  pending: {
+    from: string;
+    to: string;
+    san: string;
+    by: ChessColor;
+    piece: string;
+    captured: string;
+    need: number;
+    k: number;
+  } | null;
+  answered: Record<ChessColor, boolean>;
+  reveal: { w: number | null; b: number | null; w_ok: boolean; b_ok: boolean; correct: number; ok: boolean } | null;
+  moves: string[];
+  last_move: { from: string; to: string } | null;
+  result: { winner: ChessColor | null; reason: string } | null;
+  seq: number;
+  last: ChessEvent | null;
+  log: ChessEvent[];
 }
 
 export interface Player {

@@ -148,6 +148,13 @@ function newer(prev: Room | null, next: Room): Room {
 }
 
 export function currentDeadline(room: Room): number | null {
+  if (room.game === "chess") {
+    // لا ساعة للعبة: العدّاد للأسئلة فقط (مع ثانية سماح للإجابة)
+    const phase = room.chess?.phase;
+    if (room.status !== "playing" || !room.question_deadline || (phase !== "question" && phase !== "reveal"))
+      return null;
+    return Date.parse(room.question_deadline) + (phase === "question" ? 1000 : 0);
+  }
   if (room.game === "ludo") {
     if (room.status !== "playing" || !room.question_deadline) return null;
     // ثانية سماح للإجابة (نفس القاعدة)

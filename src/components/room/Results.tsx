@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { rankPlayers, type LudoState, type Player, type Room } from "@/lib/types";
+import { rankPlayers, type ChessState, type LudoState, type Player, type Room } from "@/lib/types";
 import { rankTeams, teamInfo, type TeamStanding } from "@/lib/teams";
 import { Avatar } from "../ui";
 
@@ -10,6 +10,7 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
   const me = ranked.find((p) => p.user_id === userId);
   const teams = room.team_size != null ? rankTeams(players) : [];
   const ludo = room.game === "ludo" && room.ludo?.sides ? room.ludo : null;
+  const chess = room.game === "chess" && room.chess ? room.chess : null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -24,7 +25,9 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
         )}
       </section>
 
-      {ludo ? (
+      {chess ? (
+        <ChessResult chess={chess} players={players} userId={userId} />
+      ) : ludo ? (
         <LudoPlaces ludo={ludo} players={players} userId={userId} />
       ) : (
         <>
@@ -33,7 +36,7 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
         </>
       )}
 
-      {(teams.length > 0 || ludo) && (
+      {(teams.length > 0 || ludo || chess) && (
         <h2 className="pt-2 text-center font-bold text-indigo-200">ترتيب اللاعبين بالنقاط</h2>
       )}
 
@@ -199,5 +202,35 @@ function LudoPlaces({ ludo, players, userId }: { ludo: LudoState; players: Playe
         })}
       </ol>
     </section>
+  );
+}
+
+/** الشطرنج: الطرف الفائز أو التعادل */
+function ChessResult({ chess, players, userId }: { chess: ChessState; players: Player[]; userId: string }) {
+  const winner = chess.result?.winner ?? null;
+  const colorName = { w: "الأبيض", b: "الأسود" } as const;
+  const sideName = (color: "w" | "b") => {
+    const s = chess.sides[color];
+    if (s.team != null) return teamInfo(s.team).name;
+    const p = players.find((x) => x.user_id === s.captain);
+    return p ? `${p.avatar} ${p.name}` : "";
+  };
+  const myTeam = players.find((p) => p.user_id === userId)?.team ?? null;
+  const mine = (["w", "b"] as const).find((c) =>
+    chess.sides[c].team != null ? chess.sides[c].team === myTeam : chess.sides[c].captain === userId,
+  );
+  const reason = chess.result?.reason;
+  return (
+    <div className="animate-pop rounded-3xl border border-amber-300/50 bg-amber-400/15 p-5 text-center">
+      <div className="text-5xl">{winner ? "♚" : "🤝"}</div>
+      <p className="mt-2 text-2xl font-black">
+        {winner ? `فاز ${colorName[winner]}: ${sideName(winner)}!` : reason ? "تعادل" : "أُنهيت اللعبة بدون فائز"}
+      </p>
+      <p className="mt-1 text-indigo-100">
+        {reason === "checkmate" ? "كش مات" : reason === "stalemate" ? "لا توجد حركة (تعادل)" : reason ? "تعادل" : ""}
+        {mine && winner && <> • {mine === winner ? "🎉 مبروك!" : "حظ أوفر المرة القادمة 💪"}</>}
+      </p>
+      <p className="mt-2 text-xs text-indigo-200">{chess.moves.length} حركة</p>
+    </div>
   );
 }

@@ -16,6 +16,7 @@ import { QuestionView } from "./QuestionView";
 import { PickCategory } from "./PickCategory";
 import { StopGame } from "./StopGame";
 import { LudoGame } from "./LudoGame";
+import { ChessGame } from "./ChessGame";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 import { VoiceChat } from "./VoiceChat";
@@ -95,7 +96,14 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
 
       {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
 
-      {room.status === "playing" && room.ludo && (
+      {room.status === "playing" && room.game === "chess" && room.chess && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <ChessGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
+        </div>
+      )}
+
+      {room.status === "playing" && room.game === "ludo" && room.ludo && (
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
           <LudoGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
           <Scoreboard players={players} userId={userId} room={room} call={call} />

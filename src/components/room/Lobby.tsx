@@ -103,7 +103,16 @@ export function Lobby({
   const alone = players.length < 2;
   // لودو الفردي: 6 لاعبين على الأكثر (نفس شرط القاعدة)، وأكثر من ذلك بالفرق
   const tooMany = room.game === "ludo" && !teamMode && players.length > 6;
-  const canStart = !alone && !tooMany && allReady && !teamBlock;
+  // الشطرنج الفردي للاعبين اثنين بالضبط، وفي الفرق فريقان بالضبط
+  const chessBlock =
+    room.game !== "chess"
+      ? ""
+      : !teamMode && players.length > 2
+        ? `الشطرنج الفردي للاعبين اثنين فقط، وفي الغرفة ${players.length}. اختر "فريقان".`
+        : teamMode && teamCount !== 2 && !teamBlock
+          ? "الشطرنج بين فريقين بالضبط"
+          : "";
+  const canStart = !alone && !tooMany && !chessBlock && allReady && !teamBlock;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -122,7 +131,15 @@ export function Lobby({
         </div>
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
-          {room.game === "ludo" ? (
+          {room.game === "chess" ? (
+            <>
+              <span>♟️ شطرنج الأسئلة</span>
+              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+              <span>+{room.points_correct} للصحيحة</span>
+              <span>−{room.points_wrong} للخاطئة</span>
+              <span>{room.question_seconds} ث لكل سؤال</span>
+            </>
+          ) : room.game === "ludo" ? (
             <>
               <span>🎲 لودو الأسئلة</span>
               <span>{room.ludo?.steps ?? 10} خطوات للفوز</span>
@@ -232,6 +249,7 @@ export function Lobby({
             </p>
           )}
           {teamBlock && <p className="text-center text-sm text-amber-200">👥 {teamBlock}</p>}
+          {chessBlock && <p className="text-center text-sm text-amber-200">♟️ {chessBlock}</p>}
         </div>
       ) : (
         <div className="space-y-2">

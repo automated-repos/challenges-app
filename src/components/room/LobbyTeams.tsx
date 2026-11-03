@@ -19,7 +19,7 @@ export function TeamSettings({ room, busy, run }: { room: Room; busy: boolean; r
     { count: 4, label: "4 فرق" },
     { count: 5, label: "5 فرق" },
     { count: 6, label: "6 فرق" },
-  ];
+  ].filter((o) => room.game !== "chess" || o.count == null || o.count === 2); // الشطرنج: فردي أو فريقان
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
       <h2 className="mb-3 font-bold">وضع اللعب</h2>
@@ -59,11 +59,13 @@ export function TeamSettings({ room, busy, run }: { room: Room; busy: boolean; r
         <p className="mt-2 text-xs text-indigo-300">
           الفرق لا يلزم أن تكون متساوية (حتى {room.team_size} لاعبين في الفريق). يمكنك نقل أي لاعب من القائمة بجانب
           اسمه.{" "}
-          {room.game === "ludo"
-            ? "كل فريق له لون وقطعة واحدة، وأي عضو فيه يرمي ويجيب في دوره."
-            : room.play_mode === "turns"
-              ? "الأدوار تتناوب بين الفرق. الفائز هو الفريق صاحب أعلى مجموع نقاط."
-              : "الإجابة الخاطئة تمنع الفريق كله من السؤال. الفائز هو الفريق صاحب أعلى مجموع نقاط."}
+          {room.game === "chess"
+            ? "في كل فريق قائد يحرك (أول من دخل، ويمكن تغييره أثناء اللعب)، والباقون يقترحون عليه الحركات."
+            : room.game === "ludo"
+              ? "كل فريق له لون وقطعة واحدة، وأي عضو فيه يرمي ويجيب في دوره."
+              : room.play_mode === "turns"
+                ? "الأدوار تتناوب بين الفرق. الفائز هو الفريق صاحب أعلى مجموع نقاط."
+                : "الإجابة الخاطئة تمنع الفريق كله من السؤال. الفائز هو الفريق صاحب أعلى مجموع نقاط."}
         </p>
       )}
     </section>
