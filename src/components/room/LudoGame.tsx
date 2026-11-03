@@ -1,102 +1,34 @@
 "use client";
 
 import { useEffect, useRef, useState, type RefObject } from "react";
-import { errorMessage } from "@/lib/supabase";
+import { errorMessage, getSupabase } from "@/lib/supabase";
 import { sounds } from "@/lib/sound";
-import type { LudoState, Player, Room } from "@/lib/types";
+import { teamInfo } from "@/lib/teams";
+import type { Category, LudoEvent, LudoSide, LudoState, Player, Room } from "@/lib/types";
 import { ErrorBox } from "../ui";
 import { msLeft, TimerBar, useServerNow } from "./QuestionView";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
-type Cell = [number, number]; // [عمود، صف] في شبكة 15×15
 
-// ---------- هندسة اللوحة (يجب أن تطابق 0014_ludo.sql) ----------
+// مدة كل مرحلة بالثواني (يجب أن تطابق 0016_ludo_quiz.sql)
+const ROLL_SECONDS = 20;
+const PICK_SECONDS = 15;
+const RESULT_SECONDS = 4;
+const MEDALS = ["🥇", "🥈", "🥉"];
 
-// المسار المشترك: 52 مربعاً تبدأ من نقطة انطلاق الأحمر وتدور مع عقارب الساعة.
-// نقاط البداية: الأحمر 0، الأخضر 13، الأصفر 26، الأزرق 39
-const TRACK: Cell[] = [
-  ...range(1, 5).map((x) => [x, 6] as Cell),
-  ...range(5, 0, -1).map((y) => [6, y] as Cell),
-  [7, 0],
-  [8, 0],
-  ...range(1, 5).map((y) => [8, y] as Cell),
-  ...range(9, 14).map((x) => [x, 6] as Cell),
-  [14, 7],
-  [14, 8],
-  ...range(13, 9, -1).map((x) => [x, 8] as Cell),
-  ...range(9, 14).map((y) => [8, y] as Cell),
-  [7, 14],
-  [6, 14],
-  ...range(13, 9, -1).map((y) => [6, y] as Cell),
-  ...range(5, 0, -1).map((x) => [x, 8] as Cell),
-  [0, 7],
-  [0, 6],
-];
+const sideColor = (s: LudoSide) => teamInfo(s.color).hex;
 
-// ممرات النهاية (المواقع 51..55) لكل لون
-const HOME_LANE: Cell[][] = [
-  range(1, 5).map((x) => [x, 7] as Cell),
-  range(1, 5).map((y) => [7, y] as Cell),
-  range(13, 9, -1).map((x) => [x, 7] as Cell),
-  range(13, 9, -1).map((y) => [7, y] as Cell),
-];
-
-// زاوية البيت لكل لون (أعلى يسار المربع 6×6)
-const YARD: Cell[] = [
-  [0, 0],
-  [9, 0],
-  [9, 9],
-  [0, 9],
-];
-
-// مكان القطع بعد الوصول (حول المركز)
-const FINISH: [number, number][] = [
-  [6.5, 7.5],
-  [7.5, 6.5],
-  [8.5, 7.5],
-  [7.5, 8.5],
-];
-
-const SAFE = [0, 8, 13, 21, 26, 34, 39, 47];
-
-const COLORS = [
-  { name: "الأحمر", fill: "#ef4444", light: "#fecaca", dark: "#991b1b" },
-  { name: "الأخضر", fill: "#22c55e", light: "#bbf7d0", dark: "#166534" },
-  { name: "الأصفر", fill: "#eab308", light: "#fef08a", dark: "#854d0e" },
-  { name: "الأزرق", fill: "#3b82f6", light: "#bfdbfe", dark: "#1e3a8a" },
-];
-
-const DICE = ["", "⚀", "⚁", "⚂", "⚃", "⚄", "⚅"];
-
-function range(a: number, b: number, step = 1): number[] {
-  const out: number[] = [];
-  for (let i = a; step > 0 ? i <= b : i >= b; i += step) out.push(i);
-  return out;
+function sideName(s: LudoSide, players: Player[]): string {
+  if (s.team != null) return teamInfo(s.team).name;
+  const p = players.find((x) => x.user_id === s.user);
+  return p ? `${p.avatar} ${p.name}` : "لاعب غادر";
 }
 
-/** مركز القطعة على اللوحة */
-function tokenPoint(color: number, pos: number, token: number): [number, number] {
-  if (pos === -1) {
-    const [x, y] = YARD[color];
-    return [x + 1.75 + (token % 2) * 2.5, y + 1.75 + Math.floor(token / 2) * 2.5];
-  }
-  if (pos === 56) {
-    const [x, y] = FINISH[color];
-    return [x + ((token % 2) - 0.5) * 0.45, y + (Math.floor(token / 2) - 0.5) * 0.45];
-  }
-  const [x, y] = pos <= 50 ? TRACK[(color * 13 + pos) % 52] : HOME_LANE[color][pos - 51];
-  return [x + 0.5, y + 0.5];
+/** رقم لون اللاعب: فريقه، أو هو نفسه في الفردي */
+function sideOf(l: LudoState, userId: string, players: Player[]): number {
+  const team = players.find((p) => p.user_id === userId)?.team ?? null;
+  return (l.sides ?? []).findIndex((s) => (s.team != null ? s.team === team : s.user === userId));
 }
-
-/** القطع التي يمكن تحريكها (نفس _ludo_legal) */
-function legalTokens(l: LudoState, player: number, dice: number): number[] {
-  return [0, 1, 2, 3].filter((t) => {
-    const p = l.tokens[player][t];
-    return (p === -1 && dice === 6) || (p >= 0 && p + dice <= 56);
-  });
-}
-
-// ---------- المكوّن ----------
 
 export function LudoGame({
   room,
@@ -115,15 +47,15 @@ export function LudoGame({
 }) {
   const now = useServerNow(offset);
   const l = room.ludo!;
+  const sides = l.sides ?? [];
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [rolling, setRolling] = useState(false);
-
-  const me = l.players.indexOf(userId);
-  const myTurn = room.turn_player === userId;
-  const turnName = (i: number) => players.find((p) => p.user_id === l.players[i]);
-  const legal = myTurn && l.phase === "move" && l.dice ? legalTokens(l, me, l.dice) : [];
   useLudoSounds(l);
+
+  const mine = sideOf(l, userId, players);
+  const myTurn = mine === l.turn;
+  const turnSide = sides[l.turn];
+  const color = turnSide ? sideColor(turnSide) : "#6366f1";
 
   async function act(fn: string, args: Record<string, unknown> = {}) {
     setBusy(true);
@@ -137,78 +69,73 @@ export function LudoGame({
     }
   }
 
-  async function roll() {
-    setRolling(true);
-    setTimeout(() => setRolling(false), 450);
-    await act("ludo_roll");
-  }
-
-  const turnPlayer = turnName(l.turn);
-  const turnColor = COLORS[l.colors[l.turn]];
+  const total =
+    l.phase === "roll"
+      ? ROLL_SECONDS
+      : l.phase === "pick"
+        ? PICK_SECONDS
+        : l.phase === "answer"
+          ? room.question_seconds
+          : RESULT_SECONDS;
 
   return (
-    <section className="space-y-3">
-      {/* صاحب الدور والنرد */}
-      <div
-        className="flex flex-wrap items-center gap-3 rounded-3xl border-2 p-3"
-        style={{ borderColor: turnColor.fill, background: `${turnColor.fill}22` }}
-      >
-        <div className="flex-1">
-          <p className="text-lg font-black">
-            {myTurn
-              ? l.phase === "roll"
-                ? "🎲 دورك! ارمِ النرد"
-                : "👆 اختر قطعة لتحريكها"
-              : `⏳ دور ${turnPlayer?.avatar ?? ""} ${turnPlayer?.name ?? ""}`}
-          </p>
-          <LastEvent l={l} players={players} />
-        </div>
-        <button
-          onClick={roll}
-          disabled={!myTurn || l.phase !== "roll" || busy}
-          className={`flex h-16 w-16 items-center justify-center rounded-2xl bg-white text-5xl leading-none text-black shadow-lg transition disabled:opacity-60 ${
-            myTurn && l.phase === "roll" ? "animate-pulse ring-4 ring-amber-300" : ""
-          } ${rolling ? "animate-spin" : ""}`}
-          title="ارمِ النرد"
-        >
-          {l.dice ? DICE[l.dice] : l.last ? DICE[l.last.dice] : "🎲"}
-        </button>
-        <div className="w-full">
-          <TimerBar seconds={msLeft(room.question_deadline, now)} total={room.question_seconds} />
-        </div>
+    <section className="mx-auto w-full max-w-2xl space-y-4">
+      <SideChips l={l} players={players} mine={mine} />
+
+      <Board l={l} />
+
+      {/* لوحة الدور: الزهر، أو اختيار المجال، أو السؤال */}
+      <div className="space-y-3 rounded-3xl border-2 bg-white/5 p-4 text-center" style={{ borderColor: `${color}99` }}>
+        <p className="text-lg font-black" style={{ color }}>
+          {turnSide && `دور ${sideName(turnSide, players)}`}
+          {myTurn && " (دورك!)"}
+        </p>
+
+        {l.phase === "roll" && (
+          <>
+            <Dice value={l.dice} seq={l.seq} />
+            <button
+              onClick={() => act("ludo_roll")}
+              disabled={!myTurn || busy}
+              className={`mx-auto block rounded-2xl px-8 py-3 text-lg font-black text-white shadow-lg transition disabled:opacity-50 ${
+                myTurn ? "hover:scale-105" : ""
+              }`}
+              style={{ background: color }}
+            >
+              ارمِ الزهر 🎲
+            </button>
+          </>
+        )}
+
+        {l.phase === "pick" && (
+          <PickLudoCategory
+            room={room}
+            myTurn={myTurn}
+            busy={busy}
+            onPick={(id) => act("ludo_pick", { p_category: id })}
+          />
+        )}
+
+        {(l.phase === "answer" || l.phase === "result") && room.question && (
+          <LudoQuestion
+            room={room}
+            l={l}
+            canAnswer={myTurn && l.phase === "answer" && !busy}
+            onAnswer={(i) => act("ludo_answer", { p_choice: i })}
+          />
+        )}
+
+        <p className="text-sm text-indigo-100">{eventText(l, players)}</p>
+        {error && <ErrorBox>{error}</ErrorBox>}
+        <TimerBar seconds={msLeft(room.question_deadline, now)} total={total} />
       </div>
 
-      {error && <ErrorBox>{error}</ErrorBox>}
-
-      <Board l={l} legal={legal} me={me} onMove={(t) => act("ludo_move", { p_token: t })} disabled={busy} />
-
-      {/* اللاعبون وألوانهم وتقدمهم */}
-      <ul className="grid grid-cols-2 gap-2">
-        {l.players.map((uid, i) => {
-          const p = players.find((x) => x.user_id === uid);
-          const c = COLORS[l.colors[i]];
-          const home = l.tokens[i].filter((x) => x === 56).length;
-          return (
-            <li
-              key={uid}
-              className={`flex items-center gap-2 rounded-xl px-3 py-2 text-sm ${i === l.turn ? "ring-2" : ""}`}
-              style={{ background: `${c.fill}26`, ["--tw-ring-color" as string]: c.fill }}
-            >
-              <span className="h-4 w-4 shrink-0 rounded-full border-2 border-white" style={{ background: c.fill }} />
-              <span className="flex-1 truncate">
-                {p?.avatar} {p?.name}
-                {uid === userId && " (أنت)"}
-              </span>
-              <span title="قطع وصلت">🏠 {home}/4</span>
-            </li>
-          );
-        })}
-      </ul>
+      <GameLog l={l} players={players} />
 
       {isHost && (
         <div className="flex flex-wrap justify-center gap-2">
-          <button onClick={() => act("skip_question")} className="btn-ghost" title="يُلعب عن صاحب الدور تلقائياً">
-            ⏭️ العب عن صاحب الدور
+          <button onClick={() => act("skip_question")} className="btn-ghost" title="لصاحب دور غائب مثلاً">
+            ⏭️ تخطي المرحلة
           </button>
           <button
             onClick={() => {
@@ -224,143 +151,117 @@ export function LudoGame({
   );
 }
 
-function LastEvent({ l, players }: { l: LudoState; players: Player[] }) {
-  if (!l.last) return <p className="text-sm text-indigo-200">قطعة تخرج من البيت بالـ 6 فقط</p>;
-  const p = players.find((x) => x.user_id === l.last!.player);
-  const who = p ? `${p.avatar} ${p.name}` : "";
-  const e = l.last;
-  let text = `${who} رمى ${e.dice}`;
-  if (e.type === "no_move") text += " ولا توجد حركة ممكنة";
-  if (e.type === "three_sixes") text += " للمرة الثالثة: ضاع الدور 😅";
-  if (e.type === "move") {
-    if (e.from === -1) text = `${who} أخرج قطعة من البيت 🚀`;
-    else if (e.to === 56) text = `${who} أوصل قطعة للنهاية 🏠 (+10)`;
-    else text = `${who} حرّك قطعة ${e.dice} خطوات`;
-    if (e.captured) text += ` وأكل ${e.captured > 1 ? `${e.captured} قطع` : "قطعة"} 💥 (+${e.captured * 5})`;
-  }
-  return <p className="text-sm text-indigo-100">{text}</p>;
+/** الألوان وحالة كل لون: في البيت، الخطوات، أو المركز */
+function SideChips({ l, players, mine }: { l: LudoState; players: Player[]; mine: number }) {
+  return (
+    <ul className="flex flex-wrap justify-center gap-2">
+      {(l.sides ?? []).map((s, i) => {
+        const place = l.places.indexOf(i);
+        const pos = l.pos[i];
+        return (
+          <li
+            key={i}
+            className={`flex items-center gap-1.5 rounded-full border-2 px-3 py-1 text-sm font-bold ${
+              i === l.turn ? "" : "border-transparent"
+            } ${i === mine ? "bg-white/15" : "bg-white/5"}`}
+            style={i === l.turn ? { borderColor: "#fbbf24" } : undefined}
+          >
+            <span className="h-3 w-3 rounded-full" style={{ background: sideColor(s) }} />
+            <span className="max-w-32 truncate">{sideName(s, players)}</span>
+            <span className="text-xs text-indigo-200">
+              {place >= 0 ? (MEDALS[place] ?? `🏁${place + 1}`) : pos < 0 ? "🏠" : `${pos}/${l.steps}`}
+            </span>
+          </li>
+        );
+      })}
+    </ul>
+  );
 }
 
-function Board({
-  l,
-  legal,
-  me,
-  onMove,
-  disabled,
-}: {
-  l: LudoState;
-  legal: number[];
-  me: number;
-  onMove: (token: number) => void;
-  disabled: boolean;
-}) {
-  // ألوان الزوايا: الألوان غير المستخدمة تظهر باهتة
-  const used = new Set(l.colors);
+// ---------- اللوحة: دائرة، لكل لون مسار من بيته (الحافة) إلى النهاية (المركز) ----------
 
-  // تجميع القطع حسب المكان حتى تظهر المتراكبة بجانب بعضها
-  const stacks = new Map<string, number>();
-  const tokens = l.tokens.flatMap((arr, pi) =>
-    arr.map((pos, t) => {
-      const color = l.colors[pi];
-      const [x, y] = tokenPoint(color, pos, t);
-      const key = pos >= 0 && pos !== 56 ? `${x},${y}` : `${pi}-${t}`;
-      const n = stacks.get(key) ?? 0;
-      stacks.set(key, n + 1);
-      return { pi, t, pos, color, x, y, n };
-    }),
-  );
+const C = 200; // مركز اللوحة
+const HOME_R = 172; // بعد البيت عن المركز
+const FIRST_R = 146; // أول خطوة
+const LAST_R = 58; // آخر خطوة قبل النهاية
+const CENTER_R = 40;
+
+function point(i: number, n: number, r: number): [number, number] {
+  const a = (-90 + (360 * i) / n) * (Math.PI / 180);
+  return [C + r * Math.cos(a), C + r * Math.sin(a)];
+}
+
+/** نصف القطر لموقع على المسار (0..steps-1) */
+function stepRadius(pos: number, steps: number) {
+  return steps <= 1 ? FIRST_R : FIRST_R - ((FIRST_R - LAST_R) * pos) / (steps - 1);
+}
+
+function piecePoint(i: number, n: number, pos: number, steps: number): [number, number] {
+  if (pos < 0) return point(i, n, HOME_R);
+  if (pos >= steps) return point(i, n, 30); // في النهاية: على حافة المركز حتى تظهر كل القطع وكلمة النهاية
+  return point(i, n, stepRadius(pos, steps));
+}
+
+function Board({ l }: { l: LudoState }) {
+  const sides = l.sides ?? [];
+  const n = Math.max(sides.length, 1);
+  const steps = l.steps;
+  const spacing = (FIRST_R - LAST_R) / Math.max(steps - 1, 1);
+  const dotR = Math.max(4, Math.min(11, spacing * 0.62));
 
   return (
-    <div className="mx-auto w-full max-w-[560px] select-none" dir="ltr">
-      <svg viewBox="-0.2 -0.2 15.4 15.4" className="w-full rounded-2xl bg-white shadow-xl">
-        {/* البيوت الأربعة */}
-        {YARD.map(([x, y], c) => (
-          <g key={c} opacity={used.has(c) ? 1 : 0.35}>
-            <rect x={x} y={y} width={6} height={6} fill={COLORS[c].fill} />
-            <rect x={x + 0.75} y={y + 0.75} width={4.5} height={4.5} rx={0.4} fill="#fff" />
-            {[0, 1, 2, 3].map((t) => (
-              <circle
-                key={t}
-                cx={x + 1.75 + (t % 2) * 2.5}
-                cy={y + 1.75 + Math.floor(t / 2) * 2.5}
-                r={0.55}
-                fill={COLORS[c].light}
-                stroke={COLORS[c].fill}
-                strokeWidth={0.08}
-              />
-            ))}
-          </g>
-        ))}
+    <div className="mx-auto w-full max-w-[420px] select-none" dir="ltr">
+      <svg viewBox="0 0 400 400" className="w-full drop-shadow-xl">
+        <circle cx={C} cy={C} r={196} fill="#f7f0e3" />
 
-        {/* المسار */}
-        {TRACK.map(([x, y], i) => {
-          const startColor = [0, 13, 26, 39].indexOf(i);
+        {sides.map((s, i) => {
+          const hex = sideColor(s);
+          const [hx, hy] = point(i, n, HOME_R);
           return (
             <g key={i}>
-              <rect
-                x={x}
-                y={y}
-                width={1}
-                height={1}
-                fill={startColor >= 0 ? COLORS[startColor].fill : "#fff"}
-                stroke="#94a3b8"
-                strokeWidth={0.04}
-              />
-              {SAFE.includes(i) && startColor < 0 && (
-                <text x={x + 0.5} y={y + 0.72} fontSize={0.6} textAnchor="middle" fill="#64748b">
-                  ★
-                </text>
-              )}
+              {/* الخطوات: الأقرب للنهاية أغمق، وما قطعه اللون ممتلئ */}
+              {Array.from({ length: steps }, (_, k) => {
+                const [x, y] = point(i, n, stepRadius(k, steps));
+                const reached = l.pos[i] >= k;
+                return (
+                  <circle
+                    key={k}
+                    cx={x}
+                    cy={y}
+                    r={dotR}
+                    fill={hex}
+                    opacity={reached ? 0.95 : 0.25 + (0.4 * k) / Math.max(steps - 1, 1)}
+                    stroke="#fff"
+                    strokeWidth={1}
+                  />
+                );
+              })}
+              {/* البيت */}
+              <circle cx={hx} cy={hy} r={20} fill={hex} />
+              <circle cx={hx} cy={hy} r={13} fill="none" stroke="#1e1b4b" strokeWidth={3} />
             </g>
           );
         })}
 
-        {/* ممرات النهاية */}
-        {HOME_LANE.map((lane, c) =>
-          lane.map(([x, y], i) => (
-            <rect
-              key={`${c}-${i}`}
-              x={x}
-              y={y}
-              width={1}
-              height={1}
-              fill={COLORS[c].fill}
-              opacity={used.has(c) ? 1 : 0.4}
-              stroke="#94a3b8"
-              strokeWidth={0.04}
-            />
-          )),
-        )}
+        <circle cx={C} cy={C} r={CENTER_R} fill="#fde68a" stroke="#f59e0b" strokeWidth={2} />
+        <text x={C} y={C + 4} textAnchor="middle" fontSize={11} fontWeight="bold" fill="#1e1b4b">
+          النهاية
+        </text>
 
-        {/* المركز */}
-        <polygon points="6,6 7.5,7.5 6,9" fill={COLORS[0].fill} />
-        <polygon points="6,6 7.5,7.5 9,6" fill={COLORS[1].fill} />
-        <polygon points="9,6 7.5,7.5 9,9" fill={COLORS[2].fill} />
-        <polygon points="6,9 7.5,7.5 9,9" fill={COLORS[3].fill} />
-
-        {/* القطع */}
-        {tokens.map(({ pi, t, color, x, y, n }) => {
-          const canMove = pi === me && legal.includes(t) && !disabled;
-          const shift = n * 0.18;
+        {/* القطع (تتحرك بسلاسة بتحويل CSS) */}
+        {sides.map((s, i) => {
+          const [x, y] = piecePoint(i, n, l.pos[i], steps);
+          const active = i === l.turn && l.phase !== "done";
           return (
-            <g
-              key={`${pi}-${t}`}
-              onClick={canMove ? () => onMove(t) : undefined}
-              // تحويل CSS (وحدة px = وحدة اللوحة) حتى تتحرك القطعة بسلاسة
-              style={{
-                transform: `translate(${x + shift - (n ? 0.09 : 0)}px, ${y - shift}px)`,
-                transition: "transform 0.35s ease",
-                cursor: canMove ? "pointer" : "default",
-              }}
-            >
-              {canMove && (
-                <circle r={0.5} fill="none" stroke="#f59e0b" strokeWidth={0.1}>
-                  <animate attributeName="r" values="0.42;0.56;0.42" dur="0.9s" repeatCount="indefinite" />
+            <g key={i} style={{ transform: `translate(${x}px, ${y}px)`, transition: "transform 0.7s ease" }}>
+              {active && (
+                <circle r={17} fill="none" stroke="#fbbf24" strokeWidth={3}>
+                  <animate attributeName="r" values="15;20;15" dur="1.2s" repeatCount="indefinite" />
                 </circle>
               )}
-              <circle r={0.36} fill={COLORS[color].fill} stroke="#fff" strokeWidth={0.1} />
-              <circle r={0.36} fill="none" stroke={COLORS[color].dark} strokeWidth={0.04} />
-              <circle r={0.12} fill="#fff" opacity={0.8} />
+              <circle r={12} fill={sideColor(s)} stroke="#fff" strokeWidth={3} />
+              <circle r={12} fill="none" stroke="#1e1b4b" strokeWidth={1.5} />
+              <circle r={4} fill="#fff" opacity={0.85} />
             </g>
           );
         })}
@@ -369,7 +270,218 @@ function Board({
   );
 }
 
-/** أصوات: رمي النرد، الأكل، الوصول */
+// ---------- الزهر ----------
+
+const PIPS: Record<number, number[]> = {
+  1: [4],
+  2: [0, 8],
+  3: [0, 4, 8],
+  4: [0, 2, 6, 8],
+  5: [0, 2, 4, 6, 8],
+  6: [0, 2, 3, 5, 6, 8],
+};
+
+function Dice({ value, seq }: { value: number | null; seq: number }) {
+  return (
+    <div
+      key={seq}
+      className="animate-dice mx-auto grid h-16 w-16 grid-cols-3 grid-rows-3 gap-0.5 rounded-2xl bg-[#f7f0e3] p-2.5 shadow-lg"
+    >
+      {Array.from({ length: 9 }, (_, k) => (
+        <span key={k} className="flex items-center justify-center">
+          {(PIPS[value ?? 1] ?? []).includes(k) && <span className="h-2.5 w-2.5 rounded-full bg-slate-900" />}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+// ---------- اختيار المجال ----------
+
+function PickLudoCategory({
+  room,
+  myTurn,
+  busy,
+  onPick,
+}: {
+  room: Room;
+  myTurn: boolean;
+  busy: boolean;
+  onPick: (id: number) => void;
+}) {
+  const [categories, setCategories] = useState<Category[] | null>(null);
+
+  useEffect(() => {
+    if (!myTurn) return;
+    getSupabase()
+      .rpc("list_categories")
+      .then(({ data }) => {
+        const all = (data ?? []) as Category[];
+        setCategories(room.category_ids ? all.filter((c) => room.category_ids!.includes(c.id)) : all);
+      });
+  }, [myTurn, room.category_ids]);
+
+  if (!myTurn) return <p className="py-4 text-lg font-bold">⏳ يختار مجال السؤال...</p>;
+  if (!categories) return <p className="text-indigo-200">جارٍ التحميل...</p>;
+  return (
+    <>
+      <p className="font-bold">🗂️ اختر مجال سؤالك</p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {categories.map((c) => (
+          <button
+            key={c.id}
+            onClick={() => onPick(c.id)}
+            disabled={busy}
+            className="rounded-2xl border border-white/15 bg-white/5 px-3 py-3 font-bold transition hover:bg-indigo-500/30 disabled:opacity-50"
+          >
+            <span className="block text-2xl">{c.icon}</span>
+            {c.name}
+          </button>
+        ))}
+      </div>
+      <p className="text-xs text-indigo-300">إن انتهى الوقت يُختار مجال عشوائي</p>
+    </>
+  );
+}
+
+// ---------- السؤال ----------
+
+function LudoQuestion({
+  room,
+  l,
+  canAnswer,
+  onAnswer,
+}: {
+  room: Room;
+  l: LudoState;
+  canAnswer: boolean;
+  onAnswer: (i: number) => void;
+}) {
+  const q = room.question!;
+  const result = l.phase === "result";
+  const chosen = result ? (l.last?.choice ?? null) : null;
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-indigo-200">
+        {q.icon} {q.category} • الزهر: {l.dice}
+      </p>
+      <h3 className="text-xl font-black leading-relaxed">{q.text}</h3>
+      <div className="grid grid-cols-2 gap-2">
+        {q.options.map((opt, i) => {
+          const isCorrect = result && room.correct_index === i;
+          const isWrong = result && chosen === i && room.correct_index !== i;
+          return (
+            <button
+              key={i}
+              onClick={() => onAnswer(i)}
+              disabled={!canAnswer}
+              className={`rounded-2xl px-3 py-3 font-bold transition ${
+                isCorrect
+                  ? "bg-emerald-500 text-white"
+                  : isWrong
+                    ? "bg-rose-500 text-white"
+                    : canAnswer
+                      ? "bg-white/10 hover:bg-indigo-500/40"
+                      : "bg-white/10 opacity-70"
+              }`}
+            >
+              {opt}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+// ---------- رسالة آخر حدث ----------
+
+function eventText(l: LudoState, players: Player[]): string {
+  const sides = l.sides ?? [];
+  const who = (e: LudoEvent) => (sides[e.side] ? sideName(sides[e.side], players) : "");
+  const e = l.last;
+  if (l.phase === "roll") {
+    const before = e ? `${describe(e, who(e))} • ` : "";
+    return (
+      before + (l.pos[l.turn] < 0 ? "ارمِ الزهر! محتاج 6 عشان تطلع من البيت." : "ارمِ الزهر ثم جاوب صح عشان تتقدم.")
+    );
+  }
+  if (!e) return "";
+  if (l.phase === "answer" || l.phase === "pick")
+    return e.type === "exit"
+      ? `🎉 ${who(e)} طلع من البيت! جاوب صح عشان تتقدم ${e.dice} خطوات.`
+      : `${who(e)} رمى ${e.dice}. جاوب صح عشان تتقدم ${e.dice} خطوات.`;
+  return describe(e, who(e));
+}
+
+function describe(e: LudoEvent, who: string): string {
+  switch (e.type) {
+    case "need6":
+      return `${who} رمى ${e.dice} (محتاج 6)`;
+    case "exit":
+      return `${who} رمى 6 وطلع من البيت 🎉`;
+    case "roll":
+      return `${who} رمى ${e.dice}`;
+    case "correct":
+      return `✅ ${who} جاوب صح وتقدم ${(e.to ?? 0) - (e.from ?? 0)} خطوات (+${e.points})${
+        e.place ? ` 🏆 ووصل للنهاية في المركز ${e.place}!` : ""
+      }`;
+    case "wrong":
+      return `❌ ${who} جاوب غلط (${e.points})`;
+    case "timeout":
+      return `⏰ ${who} انتهى وقته (${e.points})`;
+  }
+}
+
+// ---------- سجل اللعبة ----------
+
+function GameLog({ l, players }: { l: LudoState; players: Player[] }) {
+  const sides = l.sides ?? [];
+  return (
+    <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-4">
+      <h3 className="font-black text-amber-300">سجل اللعبة</h3>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead className="text-indigo-200">
+            <tr className="border-b border-white/10">
+              <th className="py-1 text-start">اللون</th>
+              <th>رميات</th>
+              <th>صح</th>
+              <th>غلط</th>
+              <th>خطوات</th>
+            </tr>
+          </thead>
+          <tbody>
+            {sides.map((s, i) => (
+              <tr key={i} className="border-b border-white/5 text-center">
+                <td className="max-w-36 truncate py-1 text-start font-bold" style={{ color: sideColor(s) }}>
+                  {sideName(s, players)}
+                </td>
+                <td>{l.rolls[i]}</td>
+                <td>{l.correct[i]}</td>
+                <td>{l.wrong[i]}</td>
+                <td dir="ltr">
+                  {Math.max(l.pos[i], 0)}/{l.steps}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {l.log.length > 0 && (
+        <ul className="space-y-1">
+          {l.log.map((e, k) => (
+            <li key={`${l.seq}-${k}`} className="rounded-xl bg-white/5 px-3 py-1.5 text-sm">
+              {describe(e, sides[e.side] ? sideName(sides[e.side], players) : "")}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+/** أصوات: الرمي، الإجابة الصحيحة، الخاطئة */
 function useLudoSounds(l: LudoState) {
   const last = useRef(l.seq);
   useEffect(() => {
@@ -377,8 +489,8 @@ function useLudoSounds(l: LudoState) {
     last.current = l.seq;
     const e = l.last;
     if (!e) return;
-    if (e.type === "move" && e.captured) sounds.wrong();
-    else if (e.type === "move" && e.to === 56) sounds.correct();
+    if (e.type === "correct") sounds.correct();
+    else if (e.type === "wrong" || e.type === "timeout") sounds.wrong();
     else sounds.tick();
   }, [l.seq, l.last]);
 }

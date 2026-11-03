@@ -150,16 +150,35 @@ function CreateTab() {
 
 function LudoForm() {
   const router = useRouter();
+  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [turnPick, setTurnPick] = useState<"random" | "choose">("random");
+  const [steps, setSteps] = useState(10);
   const [seconds, setSeconds] = useState(20);
+  const [pointsCorrect, setPointsCorrect] = useState(10);
+  const [pointsWrong, setPointsWrong] = useState(5);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
+  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const { data, error } = await getSupabase().rpc("create_ludo_room", { p_seconds: seconds });
+      const { data, error } = await getSupabase().rpc("create_ludo_room", {
+        p_steps: steps,
+        p_seconds: seconds,
+        p_points_correct: pointsCorrect,
+        p_points_wrong: pointsWrong,
+        p_category_ids: selected.length ? selected : null,
+        p_difficulty: difficulty,
+        p_turn_pick: turnPick,
+      });
       if (error) throw error;
       router.push(`/room/?code=${data}`);
     } catch (err) {
@@ -171,14 +190,46 @@ function LudoForm() {
   return (
     <form onSubmit={submit} className="space-y-5">
       <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
-        من 2 إلى 4 لاعبين، لكل لاعب 4 قطع. القطعة تخرج من البيت بالـ 6، والوقوف على قطعة خصم يرجعها لبيتها (إلا في
-        مربعات ★). الـ 6 أو الأكل أو الوصول = رمية إضافية. أول من يُدخل قطعه الأربع يفوز.
+        لودو الأسئلة: فردي أو فرق (حتى 6 ألوان)، والدور بالترتيب. القطعة تخرج من البيت بالـ 6، وبعد كل رمية سؤال:
+        الإجابة الصحيحة تحرّكك بعدد الزهر، والخاطئة تمنع الحركة وتخصم نقاطاً. من يصل أولاً يأخذ المركز الأول، وتستمر
+        اللعبة للمركز الثاني والثالث...
         <br />
-        النقاط: 10 لكل قطعة تصل، 5 لكل قطعة تأكلها، 20 للفائز.
+        مكافأة الوصول: الأول +30، الثاني +20، الثالث +10.
       </p>
-      <NumberField label="ثواني كل حركة (بعدها يُلعب عن اللاعب تلقائياً)" value={seconds} onChange={setSeconds} min={10} max={60} />
+
+      <Field label={`عدد الخطوات للفوز: ${steps}`}>
+        <input
+          type="range"
+          min={5}
+          max={20}
+          value={steps}
+          onChange={(e) => setSteps(Number(e.target.value))}
+          className="w-full accent-amber-400"
+        />
+      </Field>
+
+      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
+
+      <Field label="السؤال">
+        <div className="flex flex-wrap gap-2">
+          <Chip active={turnPick === "random"} onClick={() => setTurnPick("random")}>
+            🎲 سؤال عشوائي
+          </Chip>
+          <Chip active={turnPick === "choose"} onClick={() => setTurnPick("choose")}>
+            🗂️ صاحب الدور يختار المجال
+          </Chip>
+        </div>
+      </Field>
+
+      <DifficultyField value={difficulty} onChange={setDifficulty} />
+
+      <div className="grid grid-cols-2 gap-4">
+        <NumberField label="ثواني الإجابة" value={seconds} onChange={setSeconds} min={10} max={60} />
+        <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={100} />
+        <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
+      </div>
       {error && <ErrorBox>{error}</ErrorBox>}
-      <button disabled={busy} className="btn-primary w-full">
+      <button disabled={busy || !categories} className="btn-primary w-full">
         {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
       </button>
     </form>
@@ -187,7 +238,8 @@ function LudoForm() {
 
 // الخانات الشائعة في أتوبيس كومبليت (يمكن إضافة خانات خاصة)
 const STOP_PRESETS = [
-  "اسم",
+  "اسم ولد",
+  "اسم بنت",
   "حيوان",
   "نبات",
   "جماد",
@@ -200,7 +252,7 @@ const STOP_PRESETS = [
   "مشهور",
   "فيلم أو مسلسل",
 ];
-const STOP_DEFAULT = ["اسم", "حيوان", "نبات", "جماد", "بلد"];
+const STOP_DEFAULT = ["اسم ولد", "اسم بنت", "حيوان", "نبات", "جماد", "بلد"];
 
 function StopForm() {
   const router = useRouter();
@@ -305,15 +357,7 @@ function CreateForm() {
   const [error, setError] = useState("");
 
   useEffect(() => {
-    (async () => {
-      try {
-        const { data, error } = await getSupabase().rpc("list_categories");
-        if (error) throw error;
-        setCategories(data as Category[]);
-      } catch (e) {
-        setError(errorMessage(e));
-      }
-    })();
+    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
   }, []);
 
   const available = categories
@@ -322,10 +366,6 @@ function CreateForm() {
         0,
       )
     : 0;
-
-  function toggle(id: number) {
-    setSelected((s) => (s.includes(id) ? s.filter((x) => x !== id) : [...s, id]));
-  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -353,23 +393,7 @@ function CreateForm() {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <Field label="المجالات">
-        {!categories ? (
-          <p className="text-sm text-indigo-200">{error ? "" : "جارٍ التحميل..."}</p>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <Chip active={selected.length === 0} onClick={() => setSelected([])}>
-              🌐 الكل
-            </Chip>
-            {categories.map((c) => (
-              <Chip key={c.id} active={selected.includes(c.id)} onClick={() => toggle(c.id)}>
-                {c.icon} {c.name}
-                <span className="opacity-60"> ({difficulty ? c[`${difficulty}_count`] : c.question_count})</span>
-              </Chip>
-            ))}
-          </div>
-        )}
-      </Field>
+      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
 
       <Field label="طريقة اللعب">
         <div className="flex flex-wrap gap-2">
@@ -401,15 +425,7 @@ function CreateForm() {
         )}
       </Field>
 
-      <Field label="مستوى الصعوبة">
-        <div className="flex flex-wrap gap-2">
-          {DIFFICULTIES.map((d) => (
-            <Chip key={d.label} active={difficulty === d.value} onClick={() => setDifficulty(d.value)}>
-              {d.label}
-            </Chip>
-          ))}
-        </div>
-      </Field>
+      <DifficultyField value={difficulty} onChange={setDifficulty} />
 
       <div className="grid grid-cols-2 gap-4">
         <NumberField label="عدد الأسئلة" value={total} onChange={setTotal} min={1} max={100} />
@@ -449,6 +465,60 @@ function CreateForm() {
         {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
       </button>
     </form>
+  );
+}
+
+async function loadCategories(): Promise<Category[]> {
+  const { data, error } = await getSupabase().rpc("list_categories");
+  if (error) throw error;
+  return data as Category[];
+}
+
+/** اختيار المجالات (فارغة = الكل) مع عدد الأسئلة بالمستوى المختار */
+function CategoryField({
+  categories,
+  selected,
+  onChange,
+  difficulty,
+}: {
+  categories: Category[] | null;
+  selected: number[];
+  onChange: (ids: number[]) => void;
+  difficulty: Difficulty | null;
+}) {
+  const toggle = (id: number) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
+  return (
+    <Field label="المجالات">
+      {!categories ? (
+        <p className="text-sm text-indigo-200">جارٍ التحميل...</p>
+      ) : (
+        <div className="flex flex-wrap gap-2">
+          <Chip active={selected.length === 0} onClick={() => onChange([])}>
+            🌐 الكل
+          </Chip>
+          {categories.map((c) => (
+            <Chip key={c.id} active={selected.includes(c.id)} onClick={() => toggle(c.id)}>
+              {c.icon} {c.name}
+              <span className="opacity-60"> ({difficulty ? c[`${difficulty}_count`] : c.question_count})</span>
+            </Chip>
+          ))}
+        </div>
+      )}
+    </Field>
+  );
+}
+
+function DifficultyField({ value, onChange }: { value: Difficulty | null; onChange: (d: Difficulty | null) => void }) {
+  return (
+    <Field label="مستوى الصعوبة">
+      <div className="flex flex-wrap gap-2">
+        {DIFFICULTIES.map((d) => (
+          <Chip key={d.label} active={value === d.value} onClick={() => onChange(d.value)}>
+            {d.label}
+          </Chip>
+        ))}
+      </div>
+    </Field>
   );
 }
 

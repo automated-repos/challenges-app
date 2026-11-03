@@ -152,12 +152,17 @@ function Leaderboard({ userId }: { userId: string }) {
                 r.user_id === userId ? "bg-indigo-500/20" : "odd:bg-white/[0.02]"
               }`}
             >
-              <span className="text-xl">{MEDALS[r.place - 1] ?? <span className="text-sm text-indigo-200">{r.place}</span>}</span>
+              <span className="text-xl">
+                {MEDALS[r.place - 1] ?? <span className="text-sm text-indigo-200">{r.place}</span>}
+              </span>
               <span className="flex min-w-0 items-center gap-2">
                 <Avatar emoji={r.avatar} size="sm" />
                 <span className="truncate font-semibold">{r.name}</span>
               </span>
-              <span dir="ltr" className={`text-center font-black tabular-nums ${r.total_points < 0 ? "text-red-300" : ""}`}>
+              <span
+                dir="ltr"
+                className={`text-center font-black tabular-nums ${r.total_points < 0 ? "text-red-300" : ""}`}
+              >
                 {r.total_points}
               </span>
               <span className="text-center tabular-nums">{r.wins}</span>
@@ -292,12 +297,10 @@ function MatchCard({ match, userId }: { match: Match; userId: string }) {
 
       {open && (
         <div className="mt-3 space-y-1.5 border-t border-white/10 pt-3">
-          {match.game !== "ludo" && (
-            <p className="text-xs text-indigo-300">
-              {match.game === "stop" ? "الخانات" : "المجالات"}:{" "}
-              {match.categories?.length ? match.categories.join("، ") : "كل المجالات"}
-            </p>
-          )}
+          <p className="text-xs text-indigo-300">
+            {match.game === "stop" ? "الخانات" : "المجالات"}:{" "}
+            {match.categories?.length ? match.categories.join("، ") : "كل المجالات"}
+          </p>
           {players.map((p) => (
             <div
               key={p.user_id}

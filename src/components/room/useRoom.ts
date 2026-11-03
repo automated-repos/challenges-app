@@ -131,15 +131,12 @@ export function useRoom(code: string, userId: string) {
     [roomId, refreshRoom, refreshPlayers],
   );
 
-  const join = useCallback(
-    async () => {
-      const { error } = await getSupabase().rpc("join_room", { p_code: code });
-      if (error) throw error;
-      setPhase("loading");
-      setReloadKey((k) => k + 1);
-    },
-    [code],
-  );
+  const join = useCallback(async () => {
+    const { error } = await getSupabase().rpc("join_room", { p_code: code });
+    if (error) throw error;
+    setPhase("loading");
+    setReloadKey((k) => k + 1);
+  }, [code]);
 
   return { phase, error, room, players, offset, join, call };
 }
@@ -152,7 +149,9 @@ function newer(prev: Room | null, next: Room): Room {
 
 export function currentDeadline(room: Room): number | null {
   if (room.game === "ludo") {
-    return room.status === "playing" && room.question_deadline ? Date.parse(room.question_deadline) : null;
+    if (room.status !== "playing" || !room.question_deadline) return null;
+    // ثانية سماح للإجابة (نفس القاعدة)
+    return Date.parse(room.question_deadline) + (room.ludo?.phase === "answer" ? 1000 : 0);
   }
   if (room.game === "stop") {
     const active = room.status === "writing" || room.status === "voting" || room.status === "round_end";

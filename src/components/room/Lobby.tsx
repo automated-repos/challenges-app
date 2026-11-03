@@ -101,8 +101,8 @@ export function Lobby({
         : "";
   // اللعب منفرداً لا يُحتسب، فلا تبدأ المسابقة إلا بلاعبين على الأقل (نفس شرط القاعدة)
   const alone = players.length < 2;
-  // لودو: 4 لاعبين على الأكثر (نفس شرط القاعدة)
-  const tooMany = room.game === "ludo" && players.length > 4;
+  // لودو الفردي: 6 لاعبين على الأكثر (نفس شرط القاعدة)، وأكثر من ذلك بالفرق
+  const tooMany = room.game === "ludo" && !teamMode && players.length > 6;
   const canStart = !alone && !tooMany && allReady && !teamBlock;
 
   return (
@@ -124,9 +124,13 @@ export function Lobby({
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
           {room.game === "ludo" ? (
             <>
-              <span>🎲 لودو</span>
-              <span>من 2 إلى 4 لاعبين</span>
-              <span>{room.question_seconds} ث لكل حركة</span>
+              <span>🎲 لودو الأسئلة</span>
+              <span>{room.ludo?.steps ?? 10} خطوات للفوز</span>
+              <span>{room.turn_pick === "choose" ? "🗂️ صاحب الدور يختار المجال" : "🎲 سؤال عشوائي"}</span>
+              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+              <span>+{room.points_correct} للصحيحة</span>
+              <span>−{room.points_wrong} للخاطئة</span>
+              <span>{room.question_seconds} ث للإجابة</span>
             </>
           ) : room.game === "stop" ? (
             <>
@@ -163,7 +167,7 @@ export function Lobby({
         </div>
       </section>
 
-      {isHost && room.game === "quiz" && <TeamSettings room={room} busy={busy} run={run} />}
+      {isHost && room.game !== "stop" && <TeamSettings room={room} busy={busy} run={run} />}
 
       {teamMode ? (
         <LobbyTeams room={room} players={players} userId={userId} busy={busy} run={run} />
@@ -214,7 +218,7 @@ export function Lobby({
           </button>
           {tooMany && (
             <p className="text-center text-sm text-amber-200">
-              🎲 لودو من 2 إلى 4 لاعبين فقط، وفي الغرفة {players.length}.
+              🎲 لودو الفردي حتى 6 لاعبين، وفي الغرفة {players.length}. العبوا بالفرق.
             </p>
           )}
           {alone && (

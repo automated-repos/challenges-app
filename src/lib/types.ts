@@ -53,7 +53,7 @@ export interface Room {
   team_count: number | null;
   /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت أو لودو */
   game: "quiz" | "stop" | "ludo";
-  /** حالة لودو (انظر 0014_ludo.sql) */
+  /** حالة لودو (انظر 0016_ludo_quiz.sql) */
   ludo: LudoState | null;
   /** أتوبيس كومبليت: الخانات وحرف الجولة */
   stop_categories: string[] | null;
@@ -61,27 +61,44 @@ export interface Room {
   updated_at: string;
 }
 
+/** لون في لودو: فريق (team) أو لاعب (user)، و color رقم اللون في teamInfo */
+export interface LudoSide {
+  team: number | null;
+  user: string | null;
+  color: number;
+}
+
+export interface LudoEvent {
+  type: "need6" | "exit" | "roll" | "correct" | "wrong" | "timeout";
+  side: number;
+  by: string | null;
+  dice: number;
+  choice?: number | null;
+  from?: number;
+  to?: number;
+  points?: number;
+  place?: number | null;
+}
+
+/** حالة لودو الأسئلة (انظر 0016_ludo_quiz.sql) */
 export interface LudoState {
-  players: string[];
-  /** لون كل لاعب: 0 أحمر، 1 أخضر، 2 أصفر، 3 أزرق */
-  colors: number[];
-  /** موقع كل قطعة: -1 في البيت، 0..50 على المسار من نقطة بدايته، 51..55 ممر النهاية، 56 وصلت */
-  tokens: number[][];
+  steps: number;
+  /** قبل البدء لا يوجد إلا steps */
+  sides?: LudoSide[];
+  /** موقع كل لون: -1 في البيت، 0..steps (steps = وصل) */
+  pos: number[];
+  rolls: number[];
+  correct: number[];
+  wrong: number[];
+  /** ترتيب الوصول (أرقام الألوان) */
+  places: number[];
   turn: number;
+  phase: "roll" | "pick" | "answer" | "result" | "done";
   dice: number | null;
-  phase: "roll" | "move" | "done";
-  sixes: number;
+  roller: string | null;
   seq: number;
-  winner?: string;
-  last: {
-    type: "roll" | "move" | "no_move" | "three_sixes";
-    player: string;
-    dice: number;
-    token?: number;
-    from?: number;
-    to?: number;
-    captured?: number;
-  } | null;
+  last: LudoEvent | null;
+  log: LudoEvent[];
 }
 
 export interface Player {
