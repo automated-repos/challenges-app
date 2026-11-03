@@ -25,8 +25,9 @@
 15. [`supabase/migrations/0015_stop_vote_host.sql`](supabase/migrations/0015_stop_vote_host.sql): التصويت في أتوبيس كومبليت ينهيه صاحب الغرفة
 16. [`supabase/migrations/0016_ludo_quiz.sql`](supabase/migrations/0016_ludo_quiz.sql): لودو الأسئلة (يحل محل لودو 0014)
 17. [`supabase/migrations/0017_ludo_longer.sql`](supabase/migrations/0017_ludo_longer.sql): لودو أطول (الـ 6 للخروج فقط، والوصول بالرقم بالضبط)
-18. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
-19. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
+18. [`supabase/migrations/0018_stop_host_judge.sql`](supabase/migrations/0018_stop_host_judge.sql): صاحب الغرفة يصحح كلمات أتوبيس كومبليت بدل التصويت
+19. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+20. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
@@ -74,7 +75,7 @@ supabase functions deploy voice-token --no-verify-jwt
 ## أتوبيس كومبليت 🚌
 لعبة ثانية من تبويب "إنشاء مسابقة": يظهر حرف عشوائي، وكل لاعب يكتب كلمة تبدأ به في كل خانة (اسم ولد، اسم بنت، حيوان، نبات، جماد، بلد... ويمكن اختيار خانات أخرى أو إضافة خانات خاصة).
 1. أول من يملأ كل الخانات يضغط **ستوب!**، فيكون أمام الباقين 3 ثوانٍ لإرسال ما كتبوه (أو ينتهي وقت الجولة).
-2. **التصويت:** تظهر إجابات الجميع، وكل لاعب يرفض الكلمات الخاطئة. الكلمة التي يرفضها أكثر من نصف اللاعبين الآخرين تُلغى. التصويت بلا وقت محدد، وصاحب الغرفة هو من ينهيه.
+2. **التصحيح:** تظهر إجابات الجميع، و**صاحب الغرفة هو الحَكَم**: الكلمات التي تبدأ بالحرف مقبولة تلقائياً، وهو يرفض الخطأ أو يقبل كلمة رفضها الفحص التلقائي، والجميع يرى قراراته. التصحيح بلا وقت محدد، وصاحب الغرفة هو من ينهيه.
 3. **النقاط:** الكلمة الوحيدة في خانتها = 20، غير المكررة = 10، المكررة = 5، الفارغة أو المرفوضة أو بحرف خطأ = 0.
 4. النقاط تدخل لوحة الشرف مثل المسابقات.
 

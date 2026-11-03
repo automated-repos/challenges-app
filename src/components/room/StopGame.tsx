@@ -14,10 +14,11 @@ interface Answer {
   answer: string;
   points: number;
 }
-interface Vote {
+/** قرار صاحب الغرفة في كلمة (لا يوجد = الفحص التلقائي) */
+interface Mark {
   user_id: string;
   cat: number;
-  voter: string;
+  valid: boolean;
 }
 
 // نفس توحيد الكتابة في قاعدة البيانات (_ar_norm و _ar_starts)، للتنبيه فقط
@@ -35,7 +36,7 @@ export function startsWith(word: string, letter: string) {
   return w.length >= 2 && (w[0] === l || stripAl(w)[0] === l);
 }
 
-/** أتوبيس كومبليت: مراحل الجولة (كتابة ← تصويت ← نتيجة) */
+/** أتوبيس كومبليت: مراحل الجولة (كتابة ← مراجعة صاحب الغرفة ← نتيجة) */
 export function StopGame({
   room,
   players,
@@ -69,19 +70,21 @@ export function StopGame({
             {room.status === "writing"
               ? `اكتب كلمات تبدأ بحرف «${room.stop_letter}»`
               : room.status === "voting"
-                ? "🗳️ صوّت على الكلمات الخاطئة"
+                ? isHost
+                  ? "⚖️ صحّح الكلمات"
+                  : "⚖️ صاحب الغرفة يصحح الكلمات"
                 : "📊 نتيجة الجولة"}
           </p>
         </div>
         {isHost && <HostButtons room={room} call={call} />}
-        {/* التصويت بلا وقت: صاحب الغرفة ينهيه */}
+        {/* المراجعة بلا وقت: صاحب الغرفة ينهيها */}
         {room.status === "voting" ? (
           isHost ? (
             <button onClick={() => call("skip_question").catch(() => {})} className="btn-primary w-full py-3 text-lg">
-              ✅ إنهاء التصويت وحساب النقاط
+              ✅ إنهاء التصحيح وحساب النقاط
             </button>
           ) : (
-            <p className="w-full text-center text-sm text-indigo-200">⏳ التصويت مفتوح حتى ينهيه صاحب الغرفة</p>
+            <p className="w-full text-center text-sm text-indigo-200">⏳ بانتظار صاحب الغرفة لإنهاء التصحيح</p>
           )
         ) : (
           <div className="w-full">
@@ -94,7 +97,14 @@ export function StopGame({
         <Writing key={`w${room.current_index}`} room={room} players={players} userId={userId} call={call} />
       )}
       {(room.status === "voting" || room.status === "round_end") && (
-        <Review key={`r${room.current_index}`} room={room} players={players} userId={userId} call={call} />
+        <Review
+          key={`r${room.current_index}`}
+          room={room}
+          players={players}
+          userId={userId}
+          isHost={isHost}
+          call={call}
+        />
       )}
     </section>
   );
@@ -107,7 +117,7 @@ function HostButtons({ room, call }: { room: Room; call: Call }) {
         {room.status === "writing"
           ? "إنهاء الكتابة ⏭️"
           : room.status === "voting"
-            ? "إنهاء التصويت ⏭️"
+            ? "إنهاء التصحيح ⏭️"
             : "الجولة التالية ⏭️"}
       </button>
       <button
@@ -235,13 +245,25 @@ function Writing({ room, players, userId, call }: { room: Room; players: Player[
   );
 }
 
-/** التصويت ونتيجة الجولة: إجابات الجميع في كل خانة */
-function Review({ room, players, userId, call }: { room: Room; players: Player[]; userId: string; call: Call }) {
+/** التصحيح ونتيجة الجولة: إجابات الجميع في كل خانة، وصاحب الغرفة يقبل أو يرفض */
+function Review({
+  room,
+  players,
+  userId,
+  isHost,
+  call,
+}: {
+  room: Room;
+  players: Player[];
+  userId: string;
+  isHost: boolean;
+  call: Call;
+}) {
   const cats = room.stop_categories ?? [];
   const letter = room.stop_letter ?? "";
   const voting = room.status === "voting";
   const [answers, setAnswers] = useState<Answer[]>([]);
-  const [votes, setVotes] = useState<Vote[]>([]);
+  const [marks, setMarks] = useState<Mark[]>([]);
   const [error, setError] = useState("");
 
   const load = useCallback(async () => {
@@ -252,13 +274,13 @@ function Review({ room, players, userId, call }: { room: Room; players: Player[]
         .select("user_id, cat, answer, points")
         .eq("room_id", room.id)
         .eq("round", room.current_index),
-      sb.from("stop_votes").select("user_id, cat, voter").eq("room_id", room.id).eq("round", room.current_index),
+      sb.from("stop_marks").select("user_id, cat, valid").eq("room_id", room.id).eq("round", room.current_index),
     ]);
     if (a.data) setAnswers(a.data as Answer[]);
-    if (v.data) setVotes(v.data as Vote[]);
+    if (v.data) setMarks(v.data as Mark[]);
   }, [room.id, room.current_index]);
 
-  // تحديث كل ثانيتين أثناء التصويت، ومرة عند ظهور النتيجة
+  // تحديث كل ثانيتين أثناء التصحيح (ليرى الجميع قرارات صاحب الغرفة)، ومرة عند ظهور النتيجة
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- مزامنة مع القاعدة
     load();
@@ -267,20 +289,16 @@ function Review({ room, players, userId, call }: { room: Room; players: Player[]
     return () => clearInterval(id);
   }, [load, voting, room.status]);
 
-  async function toggle(owner: string, cat: number, reject: boolean) {
+  /** صاحب الغرفة يقلب حكم الكلمة. إن طابق الحكم الجديد الفحص التلقائي يُحذف القرار */
+  async function judge(owner: string, cat: number, valid: boolean, auto: boolean) {
     setError("");
-    // تحديث فوري في الشاشة، ثم الحفظ
-    setVotes((vs) =>
-      reject
-        ? [...vs, { user_id: owner, cat, voter: userId }]
-        : vs.filter((v) => !(v.user_id === owner && v.cat === cat && v.voter === userId)),
-    );
+    const mark = valid === auto ? null : valid;
+    setMarks((ms) => [
+      ...ms.filter((m) => !(m.user_id === owner && m.cat === cat)),
+      ...(mark == null ? [] : [{ user_id: owner, cat, valid: mark }]),
+    ]);
     try {
-      await call("stop_reject", {
-        p_user: owner,
-        p_cat: cat,
-        p_reject: reject,
-      });
+      await call("stop_mark", { p_user: owner, p_cat: cat, p_valid: mark });
     } catch (e) {
       setError(errorMessage(e));
       load();
@@ -288,7 +306,6 @@ function Review({ room, players, userId, call }: { room: Room; players: Player[]
   }
 
   const sorted = [...players].sort((a, b) => a.joined_at.localeCompare(b.joined_at));
-  const others = players.length - 1;
   const roundTotal = (u: string) => answers.filter((a) => a.user_id === u).reduce((s, a) => s + a.points, 0);
 
   return (
@@ -315,40 +332,35 @@ function Review({ room, players, userId, call }: { room: Room; players: Player[]
             {sorted.map((p) => {
               const a = answers.find((x) => x.user_id === p.user_id && x.cat === ci);
               const word = a?.answer?.trim() ?? "";
-              const rejects = votes.filter((v) => v.user_id === p.user_id && v.cat === ci);
-              const iRejected = rejects.some((v) => v.voter === userId);
-              const badLetter = !!word && !startsWith(word, letter);
-              const rejected = rejects.length * 2 > others;
+              const auto = !!word && startsWith(word, letter);
+              const mark = marks.find((m) => m.user_id === p.user_id && m.cat === ci);
+              const valid = !!word && (mark ? mark.valid : auto);
               const mine = p.user_id === userId;
               return (
                 <li
                   key={p.user_id}
                   className={`flex items-center gap-2 rounded-xl px-2.5 py-1.5 ${
                     mine ? "bg-indigo-500/20" : "bg-black/15"
-                  } ${(rejected || badLetter) && word ? "opacity-60" : ""}`}
+                  } ${word && !valid ? "opacity-60" : ""}`}
                 >
                   <Avatar emoji={p.avatar} size="sm" />
                   <span className="w-20 truncate text-xs text-indigo-200 sm:w-28">{p.name}</span>
-                  <span className={`flex-1 truncate font-bold ${rejected || badLetter ? "line-through" : ""}`}>
+                  <span className={`flex-1 truncate font-bold ${word && !valid ? "line-through" : ""}`}>
                     {word || <span className="font-normal text-white/30">—</span>}
                   </span>
-                  {badLetter && <span className="text-xs text-amber-300">حرف خطأ</span>}
-                  {rejects.length > 0 && (
-                    <span className="rounded-full bg-rose-500/30 px-2 text-xs" title="عدد الرافضين">
-                      ❌ {rejects.length}
-                    </span>
-                  )}
-                  {voting && !mine && word && !badLetter && (
+                  {word && !valid && <span className="text-xs text-amber-300">{mark ? "رفضها الحكم" : "حرف خطأ"}</span>}
+                  {word && valid && mark && <span className="text-xs text-emerald-300">قبلها الحكم</span>}
+                  {voting && isHost && word && (
                     <button
                       onClick={(e) => {
                         e.currentTarget.blur();
-                        toggle(p.user_id, ci, !iRejected);
+                        judge(p.user_id, ci, !valid, auto);
                       }}
                       className={`rounded-lg px-2 py-1 text-xs font-bold ${
-                        iRejected ? "bg-rose-500 text-white" : "bg-white/10 hover:bg-rose-500/40"
+                        valid ? "bg-white/10 hover:bg-rose-500/40" : "bg-emerald-600/60 hover:bg-emerald-500"
                       }`}
                     >
-                      {iRejected ? "تراجع" : "رفض"}
+                      {valid ? "❌ رفض" : "✅ قبول"}
                     </button>
                   )}
                   {!voting && (
@@ -367,8 +379,10 @@ function Review({ room, players, userId, call }: { room: Room; players: Player[]
       ))}
       {voting && (
         <p className="text-center text-xs text-indigo-300">
-          الكلمة تُلغى إن رفضها أكثر من نصف اللاعبين الآخرين. الكلمة الوحيدة في خانتها = 20، غير المكررة = 10، المكررة =
-          5.
+          {isHost
+            ? "الكلمات التي تبدأ بالحرف مقبولة تلقائياً. ارفض الخطأ، أو اقبل كلمة رفضها الفحص التلقائي."
+            : "صاحب الغرفة يقبل الكلمات أو يرفضها."}{" "}
+          الكلمة الوحيدة في خانتها = 20، غير المكررة = 10، المكررة = 5.
         </p>
       )}
     </div>
