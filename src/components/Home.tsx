@@ -154,7 +154,7 @@ function LudoForm() {
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [turnPick, setTurnPick] = useState<"random" | "choose">("random");
-  const [steps, setSteps] = useState(10);
+  const [steps, setSteps] = useState(20);
   const [seconds, setSeconds] = useState(20);
   const [pointsCorrect, setPointsCorrect] = useState(10);
   const [pointsWrong, setPointsWrong] = useState(5);
@@ -190,9 +190,9 @@ function LudoForm() {
   return (
     <form onSubmit={submit} className="space-y-5">
       <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
-        لودو الأسئلة: فردي أو فرق (حتى 6 ألوان)، والدور بالترتيب. القطعة تخرج من البيت بالـ 6، وبعد كل رمية سؤال:
-        الإجابة الصحيحة تحرّكك بعدد الزهر، والخاطئة تمنع الحركة وتخصم نقاطاً. من يصل أولاً يأخذ المركز الأول، وتستمر
-        اللعبة للمركز الثاني والثالث...
+        لودو الأسئلة: فردي أو فرق (حتى 6 ألوان)، والدور بالترتيب. بعد كل رمية سؤال: الإجابة الصحيحة تحرّكك بعدد الزهر،
+        والخاطئة تمنع الحركة وتخصم نقاطاً. الـ 6 + إجابة صحيحة تخرجك من البيت، والوصول للنهاية بالرقم بالضبط. من يصل
+        أولاً يأخذ المركز الأول، وتستمر اللعبة للمركز الثاني والثالث...
         <br />
         مكافأة الوصول: الأول +30، الثاني +20، الثالث +10.
       </p>
@@ -200,8 +200,8 @@ function LudoForm() {
       <Field label={`عدد الخطوات للفوز: ${steps}`}>
         <input
           type="range"
-          min={5}
-          max={20}
+          min={10}
+          max={30}
           value={steps}
           onChange={(e) => setSteps(Number(e.target.value))}
           className="w-full accent-amber-400"

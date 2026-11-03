@@ -69,7 +69,8 @@ export interface LudoSide {
 }
 
 export interface LudoEvent {
-  type: "need6" | "exit" | "roll" | "correct" | "wrong" | "timeout";
+  /** six = رمى 6 وهو في البيت (السؤال يخرجه)، overshoot = الرمية أكبر من الباقي */
+  type: "need6" | "six" | "roll" | "overshoot" | "correct" | "wrong" | "timeout";
   side: number;
   by: string | null;
   dice: number;
@@ -78,6 +79,8 @@ export interface LudoEvent {
   to?: number;
   points?: number;
   place?: number | null;
+  /** overshoot: الرقم المطلوب بالضبط للوصول */
+  need?: number;
 }
 
 /** حالة لودو الأسئلة (انظر 0016_ludo_quiz.sql) */

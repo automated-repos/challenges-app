@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState, type RefObject } from "react";
+import { useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import { errorMessage, getSupabase } from "@/lib/supabase";
 import { sounds } from "@/lib/sound";
 import { teamInfo } from "@/lib/teams";
@@ -181,61 +181,103 @@ function SideChips({ l, players, mine }: { l: LudoState; players: Player[]; mine
 // ---------- اللوحة: دائرة، لكل لون مسار من بيته (الحافة) إلى النهاية (المركز) ----------
 
 const C = 200; // مركز اللوحة
-const HOME_R = 172; // بعد البيت عن المركز
-const FIRST_R = 146; // أول خطوة
-const LAST_R = 58; // آخر خطوة قبل النهاية
+const HOME_R = 174; // بعد البيت عن المركز
+const END_R = 50; // نهاية المسار عند حافة المركز
 const CENTER_R = 40;
 
-function point(i: number, n: number, r: number): [number, number] {
-  const a = (-90 + (360 * i) / n) * (Math.PI / 180);
-  return [C + r * Math.cos(a), C + r * Math.sin(a)];
+type Pt = [number, number];
+const polar = (a: number, r: number): Pt => [C + r * Math.cos(a), C + r * Math.sin(a)];
+
+interface Track {
+  home: Pt;
+  /** المسار كاملاً (للرسم) */
+  line: Pt[];
+  /** مكان كل خطوة 0..steps-1، بمسافات متساوية على طول المسار */
+  cells: Pt[];
+  /** مكان القطعة بعد الوصول (على حافة المركز) */
+  finish: Pt;
 }
 
-/** نصف القطر لموقع على المسار (0..steps-1) */
-function stepRadius(pos: number, steps: number) {
-  return steps <= 1 ? FIRST_R : FIRST_R - ((FIRST_R - LAST_R) * pos) / (steps - 1);
-}
-
-function piecePoint(i: number, n: number, pos: number, steps: number): [number, number] {
-  if (pos < 0) return point(i, n, HOME_R);
-  if (pos >= steps) return point(i, n, 30); // في النهاية: على حافة المركز حتى تظهر كل القطع وكلمة النهاية
-  return point(i, n, stepRadius(pos, steps));
+/**
+ * سكة متعرجة طويلة من البيت إلى المركز: تتمايل يميناً ويساراً أثناء اقترابها من النهاية،
+ * وتتقاطع مع سكك الألوان المجاورة مثل جناحي الفراشة.
+ */
+function buildTrack(i: number, n: number, steps: number): Track {
+  const a0 = -Math.PI / 2 + (2 * Math.PI * i) / n;
+  const swing = Math.min((Math.PI / n) * 1.15, 0.95); // أكبر قليلاً من نصف المسافة بين الألوان، فتتقاطع السكك
+  const waves = Math.round((1 + steps / 20) * 2) / 2; // عدد نصفي: السكة تنتهي في اتجاه بيتها
+  const line: Pt[] = [];
+  const N = 600;
+  for (let k = 0; k <= N; k++) {
+    const t = k / N;
+    const r = HOME_R - (HOME_R - END_R) * t;
+    line.push(polar(a0 + swing * Math.sin(2 * Math.PI * waves * t) * (1 - 0.3 * t), r));
+  }
+  // الطول التراكمي لتوزيع الخطوات بالتساوي على السكة
+  const acc = [0];
+  for (let k = 1; k < line.length; k++) {
+    acc.push(acc[k - 1] + Math.hypot(line[k][0] - line[k - 1][0], line[k][1] - line[k - 1][1]));
+  }
+  const total = acc[acc.length - 1];
+  const cells: Pt[] = [];
+  let j = 0;
+  for (let k = 0; k < steps; k++) {
+    const target = (total * (k + 1)) / (steps + 1);
+    while (j < acc.length - 2 && acc[j + 1] < target) j++;
+    const f = (target - acc[j]) / Math.max(acc[j + 1] - acc[j], 1e-9);
+    cells.push([line[j][0] + (line[j + 1][0] - line[j][0]) * f, line[j][1] + (line[j + 1][1] - line[j][1]) * f]);
+  }
+  return { home: line[0], line, cells, finish: polar(a0, 28) };
 }
 
 function Board({ l }: { l: LudoState }) {
   const sides = l.sides ?? [];
   const n = Math.max(sides.length, 1);
   const steps = l.steps;
-  const spacing = (FIRST_R - LAST_R) / Math.max(steps - 1, 1);
-  const dotR = Math.max(4, Math.min(11, spacing * 0.62));
+  const tracks = useMemo(() => Array.from({ length: n }, (_, i) => buildTrack(i, n, steps)), [n, steps]);
+  // حجم الخطوة حسب المسافة بينها
+  const [c0, c1] = tracks[0].cells;
+  const dotR = Math.max(3.5, Math.min(9, (c1 ? Math.hypot(c1[0] - c0[0], c1[1] - c0[1]) : 20) * 0.42));
+
+  const piecePoint = (i: number): Pt => {
+    const pos = l.pos[i];
+    return pos < 0 ? tracks[i].home : pos >= steps ? tracks[i].finish : tracks[i].cells[pos];
+  };
 
   return (
-    <div className="mx-auto w-full max-w-[420px] select-none" dir="ltr">
+    <div className="mx-auto w-full max-w-[460px] select-none" dir="ltr">
       <svg viewBox="0 0 400 400" className="w-full drop-shadow-xl">
         <circle cx={C} cy={C} r={196} fill="#f7f0e3" />
 
+        {/* السكك: شريط عريض فاتح وخط رفيع في المنتصف يوضح الاتجاه */}
+        {sides.map((s, i) => {
+          const pts = tracks[i].line.map(([x, y]) => `${x},${y}`).join(" ");
+          return (
+            <g key={i} fill="none" stroke={sideColor(s)} strokeLinecap="round" strokeLinejoin="round">
+              <polyline points={pts} strokeOpacity={0.18} strokeWidth={dotR * 2.6} />
+              <polyline points={pts} strokeOpacity={0.55} strokeWidth={1.5} strokeDasharray="3 3" />
+            </g>
+          );
+        })}
+
         {sides.map((s, i) => {
           const hex = sideColor(s);
-          const [hx, hy] = point(i, n, HOME_R);
+          const [hx, hy] = tracks[i].home;
           return (
             <g key={i}>
               {/* الخطوات: الأقرب للنهاية أغمق، وما قطعه اللون ممتلئ */}
-              {Array.from({ length: steps }, (_, k) => {
-                const [x, y] = point(i, n, stepRadius(k, steps));
-                const reached = l.pos[i] >= k;
-                return (
-                  <circle
-                    key={k}
-                    cx={x}
-                    cy={y}
-                    r={dotR}
-                    fill={hex}
-                    opacity={reached ? 0.95 : 0.25 + (0.4 * k) / Math.max(steps - 1, 1)}
-                    stroke="#fff"
-                    strokeWidth={1}
-                  />
-                );
-              })}
+              {tracks[i].cells.map(([x, y], k) => (
+                <circle
+                  key={k}
+                  cx={x}
+                  cy={y}
+                  r={dotR}
+                  fill={hex}
+                  opacity={l.pos[i] >= k ? 0.95 : 0.3 + (0.4 * k) / Math.max(steps - 1, 1)}
+                  stroke="#fff"
+                  strokeWidth={1}
+                />
+              ))}
               {/* البيت */}
               <circle cx={hx} cy={hy} r={20} fill={hex} />
               <circle cx={hx} cy={hy} r={13} fill="none" stroke="#1e1b4b" strokeWidth={3} />
@@ -250,7 +292,7 @@ function Board({ l }: { l: LudoState }) {
 
         {/* القطع (تتحرك بسلاسة بتحويل CSS) */}
         {sides.map((s, i) => {
-          const [x, y] = piecePoint(i, n, l.pos[i], steps);
+          const [x, y] = piecePoint(i);
           const active = i === l.turn && l.phase !== "done";
           return (
             <g key={i} style={{ transform: `translate(${x}px, ${y}px)`, transition: "transform 0.7s ease" }}>
@@ -402,14 +444,21 @@ function eventText(l: LudoState, players: Player[]): string {
   const e = l.last;
   if (l.phase === "roll") {
     const before = e ? `${describe(e, who(e))} • ` : "";
+    const pos = l.pos[l.turn];
+    const left = l.steps - pos;
     return (
-      before + (l.pos[l.turn] < 0 ? "ارمِ الزهر! محتاج 6 عشان تطلع من البيت." : "ارمِ الزهر ثم جاوب صح عشان تتقدم.")
+      before +
+      (pos < 0
+        ? "ارمِ الزهر! محتاج 6 عشان تطلع من البيت."
+        : left <= 6
+          ? `محتاج ${left} بالظبط عشان توصل للنهاية.`
+          : "ارمِ الزهر ثم جاوب صح عشان تتقدم.")
     );
   }
   if (!e) return "";
   if (l.phase === "answer" || l.phase === "pick")
-    return e.type === "exit"
-      ? `🎉 ${who(e)} طلع من البيت! جاوب صح عشان تتقدم ${e.dice} خطوات.`
+    return e.type === "six"
+      ? `🎉 ${who(e)} رمى 6! جاوب صح عشان تطلع من البيت.`
       : `${who(e)} رمى ${e.dice}. جاوب صح عشان تتقدم ${e.dice} خطوات.`;
   return describe(e, who(e));
 }
@@ -418,11 +467,14 @@ function describe(e: LudoEvent, who: string): string {
   switch (e.type) {
     case "need6":
       return `${who} رمى ${e.dice} (محتاج 6)`;
-    case "exit":
-      return `${who} رمى 6 وطلع من البيت 🎉`;
+    case "six":
+      return `${who} رمى 6 🎉`;
+    case "overshoot":
+      return `${who} رمى ${e.dice} ومحتاج ${e.need} بالظبط للوصول`;
     case "roll":
       return `${who} رمى ${e.dice}`;
     case "correct":
+      if (e.from === -1) return `✅ ${who} جاوب صح وطلع من البيت 🚀 (+${e.points})`;
       return `✅ ${who} جاوب صح وتقدم ${(e.to ?? 0) - (e.from ?? 0)} خطوات (+${e.points})${
         e.place ? ` 🏆 ووصل للنهاية في المركز ${e.place}!` : ""
       }`;
