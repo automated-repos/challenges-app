@@ -49,3 +49,61 @@ body {
   100% { transform: rotate(720deg) scale(1); }
 }
 .animate-dice { animation: dice-roll 0.6s ease-out; }
+
+/* عرض الأكل في الشطرنج (2.8 ثانية): المهاجم يقفز على القطعة فتتحطم */
+@keyframes capture-backdrop {
+  0%, 100% { opacity: 0; }
+  8%, 88% { opacity: 1; }
+}
+@keyframes capture-attacker {
+  0% { transform: translateX(-130%) rotate(0); opacity: 0; }
+  8% { transform: translateX(-130%) rotate(0); opacity: 1; }
+  20% { transform: translate(-65%, -55%) rotate(-18deg); }
+  32% { transform: translate(0, 0) rotate(0) scale(1.2); }
+  40% { transform: translate(0, 0) scale(0.95); }
+  48%, 86% { transform: translate(0, 0) scale(1); opacity: 1; }
+  100% { transform: translate(0, 0) scale(1.1); opacity: 0; }
+}
+@keyframes capture-victim {
+  0%, 26% { transform: translateX(0); opacity: 1; }
+  29% { transform: translateX(-4%); }
+  31% { transform: translateX(4%); opacity: 1; }
+  32%, 100% { opacity: 0; }
+}
+@keyframes capture-half-left {
+  0%, 31% { transform: translate(0, 0) rotate(0); opacity: 0; }
+  32% { opacity: 1; }
+  62%, 100% { transform: translate(-90%, 60%) rotate(-70deg); opacity: 0; }
+}
+@keyframes capture-half-right {
+  0%, 31% { transform: translate(0, 0) rotate(0); opacity: 0; }
+  32% { opacity: 1; }
+  62%, 100% { transform: translate(90%, 60%) rotate(70deg); opacity: 0; }
+}
+@keyframes capture-flash {
+  0%, 30% { transform: scale(0); opacity: 0; }
+  33% { transform: scale(1); opacity: 0.9; }
+  50%, 100% { transform: scale(1.8); opacity: 0; }
+}
+@keyframes capture-spark {
+  0%, 31% { transform: rotate(var(--a)) translateY(0) scale(0); opacity: 0; }
+  34% { transform: rotate(var(--a)) translateY(-40%) scale(1); opacity: 1; }
+  62%, 100% { transform: rotate(var(--a)) translateY(-260%) scale(0.4); opacity: 0; }
+}
+@keyframes capture-caption {
+  0%, 38% { transform: translateY(30%) scale(0.6); opacity: 0; }
+  46% { transform: translateY(0) scale(1.08); opacity: 1; }
+  52%, 86% { transform: scale(1); opacity: 1; }
+  100% { opacity: 0; }
+}
+.capture-backdrop { animation: capture-backdrop 2.8s ease-out both; }
+.capture-attacker { animation: capture-attacker 2.8s ease-in-out both; }
+.capture-victim { animation: capture-victim 2.8s linear both; }
+.capture-half-left { animation: capture-half-left 2.8s ease-out both; clip-path: inset(0 50% 0 0); }
+.capture-half-right { animation: capture-half-right 2.8s ease-out both; clip-path: inset(0 0 0 50%); }
+.capture-flash { animation: capture-flash 2.8s ease-out both; }
+.capture-spark { animation: capture-spark 2.8s ease-out both; }
+.capture-caption { animation: capture-caption 2.8s ease-out both; }
+@media (prefers-reduced-motion: reduce) {
+  .capture-spark, .capture-flash { display: none; }
+}

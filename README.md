@@ -27,8 +27,10 @@
 17. [`supabase/migrations/0017_ludo_longer.sql`](supabase/migrations/0017_ludo_longer.sql): لودو أطول (الـ 6 للخروج فقط، والوصول بالرقم بالضبط)
 18. [`supabase/migrations/0018_stop_host_judge.sql`](supabase/migrations/0018_stop_host_judge.sql): صاحب الغرفة يصحح كلمات أتوبيس كومبليت بدل التصويت
 19. [`supabase/migrations/0019_chess.sql`](supabase/migrations/0019_chess.sql): شطرنج الأسئلة
-20. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
-21. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
+20. [`supabase/migrations/0020_pirate.sql`](supabase/migrations/0020_pirate.sql): قرصان المعرفة
+21. [`supabase/migrations/0021_chess_service_role.sql`](supabase/migrations/0021_chess_service_role.sql): صلاحية قراءة الغرف لدالة chess-move
+22. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+23. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
@@ -101,6 +103,12 @@ supabase functions deploy voice-token --no-verify-jwt
 ```bash
 supabase functions deploy chess-move --no-verify-jwt
 ```
+
+## قرصان المعرفة 🏴‍☠️
+لعبة خامسة: خريطة بحر بها جزر (من 6 إلى 16)، فردي أو فرق (حتى 6 ألوان)، والدور بالترتيب.
+- **مرحلة الغزو:** صاحب الدور يختار جزيرة خالية، والسؤال يظهر **للجميع في نفس الوقت**: أسرع إجابة صحيحة تستولي على الجزيرة. الإجابة الخاطئة تُخرج صاحبها (أو فريقه) من السؤال وتخصم نقاطاً، وإن لم يُجب أحد صح تبقى الجزيرة خالية.
+- **مرحلة الحرب** (بعد امتلاك كل الجزر): صاحب الدور يهاجم جزيرة لخصم، والسؤال للمهاجم والمدافع فقط: أسرع إجابة صحيحة تفوز، وإن لم يُجب أحد صح تبقى للمدافع. من يخسر كل جزره يخرج.
+- من يسيطر على الخريطة كلها يصبح **القرصان الأعظم** (+50 لكل أعضائه). إن أنهى منشئ الغرفة اللعبة مبكراً، يُرتب الجميع بعدد الجزر.
 
 ## التثبيت على الهاتف
 الموقع قابل للتثبيت كتطبيق: على أندرويد يظهر زر **📲 ثبّت التطبيق** في الصفحة الرئيسية (أو من قائمة Chrome ← تثبيت التطبيق). على آيفون: Safari ← زر المشاركة ← **إضافة إلى الشاشة الرئيسية**.

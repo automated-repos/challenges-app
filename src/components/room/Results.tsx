@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { rankPlayers, type ChessState, type LudoState, type Player, type Room } from "@/lib/types";
+import { rankPlayers, type ChessState, type LudoState, type PirateState, type Player, type Room } from "@/lib/types";
+import { islandCount, pirateSideName } from "./PirateGame";
 import { rankTeams, teamInfo, type TeamStanding } from "@/lib/teams";
 import { Avatar } from "../ui";
 
@@ -11,6 +12,7 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
   const teams = room.team_size != null ? rankTeams(players) : [];
   const ludo = room.game === "ludo" && room.ludo?.sides ? room.ludo : null;
   const chess = room.game === "chess" && room.chess ? room.chess : null;
+  const pirate = room.game === "pirate" && room.pirate?.sides ? room.pirate : null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -25,7 +27,9 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
         )}
       </section>
 
-      {chess ? (
+      {pirate ? (
+        <PirateResult pirate={pirate} players={players} userId={userId} />
+      ) : chess ? (
         <ChessResult chess={chess} players={players} userId={userId} />
       ) : ludo ? (
         <LudoPlaces ludo={ludo} players={players} userId={userId} />
@@ -36,7 +40,7 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
         </>
       )}
 
-      {(teams.length > 0 || ludo || chess) && (
+      {(teams.length > 0 || ludo || chess || pirate) && (
         <h2 className="pt-2 text-center font-bold text-indigo-200">ترتيب اللاعبين بالنقاط</h2>
       )}
 
@@ -232,5 +236,48 @@ function ChessResult({ chess, players, userId }: { chess: ChessState; players: P
       </p>
       <p className="mt-2 text-xs text-indigo-200">{chess.moves.length} حركة</p>
     </div>
+  );
+}
+
+/** قرصان المعرفة: القرصان الأعظم وترتيب الجميع بعدد الجزر */
+function PirateResult({ pirate, players, userId }: { pirate: PirateState; players: Player[]; userId: string }) {
+  const sides = pirate.sides ?? [];
+  const myTeam = players.find((p) => p.user_id === userId)?.team ?? null;
+  const order = sides.map((_, i) => i).sort((a, b) => islandCount(pirate, b) - islandCount(pirate, a));
+  // الفائز: من سيطر على الخريطة، أو (إن أُنهيت اللعبة مبكراً) صاحب أكثر الجزر وحده
+  const top = order.length > 1 && islandCount(pirate, order[0]) === islandCount(pirate, order[1]) ? null : order[0];
+  const winner = pirate.result?.winner ?? top;
+  return (
+    <section className="space-y-3">
+      <div className="animate-pop rounded-3xl border border-amber-300/50 bg-amber-400/15 p-5 text-center">
+        <div className="text-5xl">🏴‍☠️</div>
+        <p className="mt-2 text-2xl font-black">
+          {winner != null ? `القرصان الأعظم: ${pirateSideName(sides[winner], players)}!` : "لا يوجد قرصان أعظم (تعادل)"}
+        </p>
+        <p className="mt-1 text-indigo-100">
+          {pirate.result ? "سيطر على الخريطة كلها 🗺️" : "أُنهيت اللعبة قبل السيطرة على الخريطة كلها"}
+        </p>
+      </div>
+      <ol className="space-y-2">
+        {order.map((i, k) => {
+          const s = sides[i];
+          const info = teamInfo(s.color);
+          const isMe = s.team != null ? s.team === myTeam : s.user === userId;
+          return (
+            <li
+              key={i}
+              className={`animate-pop flex items-center gap-3 rounded-2xl border px-4 py-3 ${info.card} ${
+                isMe ? "ring-2 ring-white/60" : ""
+              }`}
+            >
+              <span className="w-8 text-center text-2xl">{MEDALS[k] ?? k + 1}</span>
+              <span className="h-4 w-4 rounded-full" style={{ background: info.hex }} />
+              <span className={`flex-1 truncate font-black ${info.text}`}>{pirateSideName(s, players)}</span>
+              <span className="text-sm text-indigo-200">🏝️ {islandCount(pirate, i)}</span>
+            </li>
+          );
+        })}
+      </ol>
+    </section>
   );
 }

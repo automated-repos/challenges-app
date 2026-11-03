@@ -17,6 +17,7 @@ import { PickCategory } from "./PickCategory";
 import { StopGame } from "./StopGame";
 import { LudoGame } from "./LudoGame";
 import { ChessGame } from "./ChessGame";
+import { PirateGame } from "./PirateGame";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 import { VoiceChat } from "./VoiceChat";
@@ -95,6 +96,13 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
       <VoiceChat roomId={room.id} {...voiceChannel(room, players, userId)} />
 
       {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
+
+      {room.status === "playing" && room.game === "pirate" && room.pirate && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <PirateGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
+        </div>
+      )}
 
       {room.status === "playing" && room.game === "chess" && room.chess && (
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">

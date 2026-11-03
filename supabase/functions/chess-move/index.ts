@@ -67,9 +67,12 @@ Deno.serve(async (req) => {
 
   // عميل بصلاحية الخادم: يقرأ الغرفة ويستدعي _chess_play
   const admin = createClient(url, Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!, { auth: { persistSession: false } });
-  const { data: room } = await admin.from("rooms").select("game, status, chess").eq("id", roomId).maybeSingle();
-  if (!room || room.game !== "chess" || room.status !== "playing" || !room.chess) {
-    return json({ error: "اللعبة غير جارية" }, 400);
+  const { data: room, error: roomError } = await admin
+    .from("rooms").select("game, status, chess").eq("id", roomId).maybeSingle();
+  if (roomError) return json({ error: `تعذّر قراءة الغرفة: ${roomError.message}` }, 500);
+  if (!room) return json({ error: "الغرفة غير موجودة" }, 404);
+  if (room.game !== "chess" || room.status !== "playing" || !room.chess) {
+    return json({ error: `اللعبة غير جارية (${room.game} / ${room.status})` }, 400);
   }
   const state = room.chess as { fen: string; seq: number; phase: string; sides: Record<string, { captain: string }> };
   if (state.phase !== "move") return json({ error: "انتظر انتهاء السؤال" }, 400);

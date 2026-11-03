@@ -52,11 +52,13 @@ export interface Room {
   /** عدد الفرق في وضع الفرق */
   team_count: number | null;
   /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت أو لودو */
-  game: "quiz" | "stop" | "ludo" | "chess";
+  game: "quiz" | "stop" | "ludo" | "chess" | "pirate";
   /** حالة لودو (انظر 0016_ludo_quiz.sql) */
   ludo: LudoState | null;
   /** حالة الشطرنج (انظر 0019_chess.sql) */
   chess: ChessState | null;
+  /** حالة قرصان المعرفة (انظر 0020_pirate.sql) */
+  pirate: PirateState | null;
   /** أتوبيس كومبليت: الخانات وحرف الجولة */
   stop_categories: string[] | null;
   stop_letter: string | null;
@@ -141,6 +143,36 @@ export interface ChessState {
   seq: number;
   last: ChessEvent | null;
   log: ChessEvent[];
+}
+
+export interface PirateEvent {
+  type: "sail" | "attack" | "wrong" | "conquered" | "captured" | "nobody" | "defended" | "war";
+  side?: number | null;
+  island?: number;
+  defender?: number | null;
+  attacker?: number;
+  from?: number | null;
+  by?: string | null;
+}
+
+/** حالة قرصان المعرفة (انظر 0020_pirate.sql) */
+export interface PirateState {
+  count: number;
+  /** قبل البدء لا يوجد إلا count */
+  islands?: { name: string; owner: number | null }[];
+  sides?: LudoSide[];
+  stage: "conquest" | "war";
+  turn: number;
+  phase: "pick" | "question" | "reveal" | "done";
+  target: number | null;
+  fighters: number[];
+  answered: number[];
+  winner: number | null;
+  by: string | null;
+  result: { winner: number } | null;
+  seq: number;
+  last: PirateEvent | null;
+  log: PirateEvent[];
 }
 
 export interface Player {

@@ -117,16 +117,17 @@ function JoinForm() {
 
 /** اختيار نوع اللعبة ثم إعداداتها */
 function CreateTab() {
-  const [game, setGame] = useState<"quiz" | "stop" | "ludo" | "chess">("quiz");
+  const [game, setGame] = useState<"quiz" | "stop" | "ludo" | "chess" | "pirate">("quiz");
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
         {(
           [
             { id: "quiz", icon: "🧠", name: "مسابقة أسئلة" },
             { id: "stop", icon: "🚌", name: "أتوبيس كومبليت" },
             { id: "ludo", icon: "🎲", name: "لودو" },
             { id: "chess", icon: "♟️", name: "شطرنج" },
+            { id: "pirate", icon: "🏴‍☠️", name: "قرصان المعرفة" },
           ] as const
         ).map((g) => (
           <button
@@ -150,8 +151,10 @@ function CreateTab() {
         <StopForm />
       ) : game === "ludo" ? (
         <LudoForm />
-      ) : (
+      ) : game === "chess" ? (
         <ChessForm />
+      ) : (
+        <PirateForm />
       )}
     </div>
   );
@@ -234,6 +237,78 @@ function LudoForm() {
 
       <div className="grid grid-cols-2 gap-4">
         <NumberField label="ثواني الإجابة" value={seconds} onChange={setSeconds} min={10} max={60} />
+        <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={100} />
+        <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
+      </div>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy || !categories} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
+function PirateForm() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [islands, setIslands] = useState(10);
+  const [seconds, setSeconds] = useState(20);
+  const [pointsCorrect, setPointsCorrect] = useState(10);
+  const [pointsWrong, setPointsWrong] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_pirate_room", {
+        p_islands: islands,
+        p_seconds: seconds,
+        p_points_correct: pointsCorrect,
+        p_points_wrong: pointsWrong,
+        p_category_ids: selected.length ? selected : null,
+        p_difficulty: difficulty,
+      });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        🏴‍☠️ خريطة بها جزر، فردي أو فرق (حتى 6). في دورك تختار جزيرة خالية، والسؤال للجميع في نفس الوقت: أسرع إجابة صحيحة
+        تستولي عليها. بعد امتلاك كل الجزر تبدأ الحرب: تهاجم جزيرة خصم، والسؤال لك وله فقط. من يخسر كل جزره يخرج، ومن
+        يسيطر على الخريطة كلها يصبح القرصان الأعظم (+50).
+      </p>
+
+      <Field label={`عدد الجزر: ${islands}`}>
+        <input
+          type="range"
+          min={6}
+          max={16}
+          value={islands}
+          onChange={(e) => setIslands(Number(e.target.value))}
+          className="w-full accent-amber-400"
+        />
+      </Field>
+
+      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
+      <DifficultyField value={difficulty} onChange={setDifficulty} />
+
+      <div className="grid grid-cols-2 gap-4">
+        <NumberField label="ثواني كل سؤال" value={seconds} onChange={setSeconds} min={10} max={60} />
         <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={100} />
         <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
       </div>

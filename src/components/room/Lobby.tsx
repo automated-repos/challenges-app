@@ -102,7 +102,7 @@ export function Lobby({
   // اللعب منفرداً لا يُحتسب، فلا تبدأ المسابقة إلا بلاعبين على الأقل (نفس شرط القاعدة)
   const alone = players.length < 2;
   // لودو الفردي: 6 لاعبين على الأكثر (نفس شرط القاعدة)، وأكثر من ذلك بالفرق
-  const tooMany = room.game === "ludo" && !teamMode && players.length > 6;
+  const tooMany = (room.game === "ludo" || room.game === "pirate") && !teamMode && players.length > 6;
   // الشطرنج الفردي للاعبين اثنين بالضبط، وفي الفرق فريقان بالضبط
   const chessBlock =
     room.game !== "chess"
@@ -131,7 +131,16 @@ export function Lobby({
         </div>
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
-          {room.game === "chess" ? (
+          {room.game === "pirate" ? (
+            <>
+              <span>🏴‍☠️ قرصان المعرفة</span>
+              <span>{room.pirate?.count ?? 10} جزر</span>
+              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+              <span>+{room.points_correct} للصحيحة</span>
+              <span>−{room.points_wrong} للخاطئة</span>
+              <span>{room.question_seconds} ث لكل سؤال</span>
+            </>
+          ) : room.game === "chess" ? (
             <>
               <span>♟️ شطرنج الأسئلة</span>
               <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
@@ -235,7 +244,8 @@ export function Lobby({
           </button>
           {tooMany && (
             <p className="text-center text-sm text-amber-200">
-              🎲 لودو الفردي حتى 6 لاعبين، وفي الغرفة {players.length}. العبوا بالفرق.
+              {room.game === "pirate" ? "🏴‍☠️ قرصان المعرفة" : "🎲 لودو"} الفردي حتى 6 لاعبين، وفي الغرفة {players.length}
+              . العبوا بالفرق.
             </p>
           )}
           {alone && (
