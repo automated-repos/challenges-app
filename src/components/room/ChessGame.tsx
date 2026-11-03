@@ -7,7 +7,7 @@ import { sounds } from "@/lib/sound";
 import { teamInfo } from "@/lib/teams";
 import type { ChessColor, ChessEvent, ChessState, Player, Room } from "@/lib/types";
 import { ErrorBox } from "../ui";
-import { msLeft, TimerBar, useServerNow } from "./QuestionView";
+import { msLeft, useServerNow } from "./QuestionView";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -129,8 +129,12 @@ export function ChessGame({
         ? "🏁 انتهت اللعبة"
         : "❓ سؤال الأكل";
 
+  // أثناء سؤال الأكل يظهر السؤال على ورقة فوق الرقعة
+  const asking = c.phase === "question" || c.phase === "reveal";
   return (
     <section className="mx-auto w-full max-w-2xl space-y-3">
+      {asking && error && <ErrorBox>{error}</ErrorBox>}
+
       <SideBar c={c} color={mine === "w" ? "b" : "w"} turn={turn} players={players} name={name} />
 
       <div className="relative">
@@ -144,25 +148,21 @@ export function ChessGame({
           name={name}
           onMove={play}
         />
+        {asking && (
+          <CaptureQuestion room={room} c={c} mine={mine} isCaptain={isCaptain} now={now} onAnswer={act} />
+        )}
         <CaptureShow c={c} />
       </div>
 
       <SideBar c={c} color={mine === "b" ? "b" : "w"} turn={turn} players={players} name={name} />
 
-      <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-center">
-        <p className="text-lg font-black">{status}</p>
-        {(c.phase === "question" || c.phase === "reveal") && (
-          <CaptureQuestion room={room} c={c} mine={mine} isCaptain={isCaptain} players={players} onAnswer={act} />
-        )}
-        {c.phase === "move" && <p className="text-sm text-indigo-200">{lastText(c, players)}</p>}
-        {error && <ErrorBox>{error}</ErrorBox>}
-        {(c.phase === "question" || c.phase === "reveal") && (
-          <TimerBar
-            seconds={msLeft(room.question_deadline, now)}
-            total={c.phase === "question" ? room.question_seconds : REVEAL_SECONDS}
-          />
-        )}
-      </div>
+      {!asking && (
+        <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-center">
+          <p className="text-lg font-black">{status}</p>
+          {c.phase === "move" && <p className="text-sm text-indigo-200">{lastText(c, players)}</p>}
+          {error && <ErrorBox>{error}</ErrorBox>}
+        </div>
+      )}
 
       {/* اقتراحات الفريق */}
       {c.phase === "move" && mine === turn && suggestions.length > 0 && (
@@ -462,99 +462,164 @@ function Board({
 
 // ---------- سؤال الأكل ----------
 
+// حافة الورقة الممزقة (نقاط ثابتة حتى لا تتغير بين الرسومات)
+const TORN = (() => {
+  const top: string[] = [];
+  const bottom: string[] = [];
+  for (let i = 0; i <= 40; i++) {
+    const x = i * 2.5;
+    top.push(`${x}% ${(1.2 + Math.sin(i * 2.3) * 1.1 + Math.sin(i * 5.1) * 0.6).toFixed(2)}%`);
+    bottom.unshift(`${x}% ${(98.8 - Math.sin(i * 1.7 + 1) * 1.1 - Math.sin(i * 4.3) * 0.6).toFixed(2)}%`);
+  }
+  return `polygon(${[...top, ...bottom].join(",")})`;
+})();
+
+/** سؤال الأكل: ورقة تنفتح بين المهاجم والمدافع فوق الرقعة، والاختيارات بجانبها عساكر */
 function CaptureQuestion({
   room,
   c,
   mine,
   isCaptain,
-  players,
+  now,
   onAnswer,
 }: {
   room: Room;
   c: ChessState;
   mine: ChessColor | null;
   isCaptain: boolean;
-  players: Player[];
+  now: number;
   onAnswer: (fn: string, args: Record<string, unknown>) => void;
 }) {
   const q = room.question;
   const p = c.pending;
   if (!q || !p) return null;
+  const foe: ChessColor = p.by === "w" ? "b" : "w";
   const reveal = c.phase === "reveal" ? c.reveal : null;
   const canAnswer = c.phase === "question" && isCaptain && mine != null && !c.answered[mine];
   const myChoice = reveal && mine ? reveal[mine] : null;
+  const pawn = mine ?? p.by;
+  const total = c.phase === "question" ? room.question_seconds : REVEAL_SECONDS;
+  const left = msLeft(room.question_deadline, now);
+  const pct = Math.max(0, Math.min(100, (left / (total * 1000)) * 100));
+  const img = (color: ChessColor, piece: string) => chessImg(`pieces/${color}${piece}.png`);
+
+  const result = reveal
+    ? reveal.ok
+      ? p.k < p.need
+        ? `✅ صح! السؤال التالي (${p.k + 1} من ${p.need})`
+        : `✅ صح! ${PIECE_NAME[p.captured]} تُؤكل`
+      : reveal[p.by === "w" ? "w_ok" : "b_ok"]
+        ? `🛡️ ${COLOR_NAME[foe]} أجاب صح أسرع! الحركة أُلغيت`
+        : "❌ خطأ! الحركة أُلغيت"
+    : null;
 
   return (
-    <div className="space-y-3">
-      <p className="rounded-2xl bg-rose-500/15 px-3 py-2 text-sm">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={chessImg(`pieces/${p.by}${p.piece}.png`)} alt="" className="inline-block h-6 w-6 align-middle" />{" "}
-        {COLOR_NAME[p.by]} ({sideName(c, p.by, players)}) يهاجم {PIECE_NAME[p.captured]}{" "}
-        <span dir="ltr">({p.san})</span>
-        {p.need > 1 && (
-          <b>
-            {" "}
-            • سؤال {p.k} من {p.need}
-          </b>
-        )}
-        <br />
-        <span className="text-xs text-indigo-200">
-          إجابة المهاجم الصحيحة = تُؤكل القطعة، والخاطئة = تُلغى الحركة. وإن أجاب الاثنان صح، الأسرع يفوز.
-        </span>
-      </p>
-      <p className="text-xs text-indigo-200">
-        {q.icon} {q.category}
-      </p>
-      <h3 className="text-xl font-black leading-relaxed">{q.text}</h3>
-      <div className="grid grid-cols-2 gap-2">
-        {q.options.map((opt, i) => {
-          const correct = reveal && reveal.correct === i;
-          const wrongMine = reveal && myChoice === i && !correct;
-          return (
-            <button
-              key={i}
-              onClick={() => onAnswer("chess_answer", { p_choice: i })}
-              disabled={!canAnswer}
-              className={`rounded-2xl px-3 py-3 font-bold transition ${
-                correct
-                  ? "bg-emerald-500 text-white"
-                  : wrongMine
-                    ? "bg-rose-500 text-white"
-                    : canAnswer
-                      ? "bg-white/10 hover:bg-indigo-500/40"
-                      : "bg-white/10 opacity-70"
-              }`}
-            >
-              {opt}
-              {reveal && (["w", "b"] as const).some((col) => reveal[col] === i) && (
-                <span className="block text-xs font-normal opacity-90">
-                  {(["w", "b"] as const)
-                    .filter((col) => reveal[col] === i)
-                    .map((col) => COLOR_NAME[col])
-                    .join(" و")}
-                </span>
+    <div
+      key={room.current_index}
+      className="scroll-backdrop absolute inset-0 z-10 mx-auto flex aspect-square max-w-[480px] items-center overflow-y-auto rounded-lg bg-black/45 px-[3%] pb-[3%] pt-[13%] backdrop-blur-[3px]"
+    >
+      <div className="relative w-full" dir="ltr">
+        {/* الورقة */}
+        <div className="scroll-paper mx-[3%] drop-shadow-[0_8px_14px_#000a]">
+          <div className="parchment px-[9%] pb-4 pt-[9%] text-[#3b2410]" style={{ clipPath: TORN }} dir="rtl">
+            <div className="scroll-content space-y-2.5 text-center">
+              <p className="text-xs font-bold text-[#7a5226]">
+                ⚔️ {PIECE_NAME[p.piece]} {COLOR_NAME[p.by]} يهاجم {PIECE_NAME[p.captured]}
+                {p.need > 1 && ` • سؤال ${p.k} من ${p.need}`}
+                <span className="mx-1 opacity-50">|</span>
+                {q.icon} {q.category}
+              </p>
+              <h3 className="text-base font-black leading-relaxed sm:text-lg">{q.text}</h3>
+
+              <div className="grid grid-cols-2 gap-1.5">
+                {q.options.map((opt, i) => {
+                  const correct = reveal && reveal.correct === i;
+                  const wrongMine = reveal && myChoice === i && !correct;
+                  const choosers = reveal ? (["w", "b"] as const).filter((col) => reveal[col] === i) : [];
+                  return (
+                    <button
+                      key={i}
+                      onClick={() => onAnswer("chess_answer", { p_choice: i })}
+                      disabled={!canAnswer}
+                      className={`flex items-center gap-1.5 rounded-xl border px-2 py-1.5 text-start text-sm font-bold transition ${
+                        correct
+                          ? "border-emerald-900 bg-emerald-700 text-white"
+                          : wrongMine
+                            ? "border-rose-900 bg-rose-700 text-white"
+                            : canAnswer
+                              ? "border-[#7a5226]/40 bg-[#7a5226]/10 hover:border-[#7a5226] hover:bg-amber-300/50 active:scale-[0.98]"
+                              : "border-[#7a5226]/25 bg-[#7a5226]/5 opacity-80"
+                      }`}
+                    >
+                      <span className="flex shrink-0">
+                        {(choosers.length ? choosers : [pawn]).map((col) => (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            key={col}
+                            src={img(col, "p")}
+                            alt=""
+                            className={`h-7 w-7 drop-shadow ${choosers.length || !reveal ? "" : "opacity-30"}`}
+                          />
+                        ))}
+                      </span>
+                      <span className="min-w-0 flex-1 break-words leading-snug">{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {result ? (
+                <p className={`font-black ${reveal?.ok ? "text-emerald-800" : "text-rose-800"}`}>{result}</p>
+              ) : (
+                <p className="flex items-center justify-center gap-3 text-xs font-bold text-[#7a5226]">
+                  {(["w", "b"] as const).map((col) => (
+                    <span key={col} className="flex items-center gap-0.5">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img(col, "p")} alt="" className="h-4 w-4" />
+                      {COLOR_NAME[col]} {c.answered[col] ? "✅" : "⏳"}
+                    </span>
+                  ))}
+                </p>
               )}
-            </button>
+
+              {/* الوقت */}
+              <div className="flex items-center gap-2" dir="ltr">
+                <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-[#7a5226]/25">
+                  <div
+                    className={`h-full rounded-full transition-[width] duration-200 ease-linear ${
+                      left <= 3000 ? "bg-rose-700" : "bg-[#8a5a1c]"
+                    }`}
+                    style={{ width: `${pct}%` }}
+                  />
+                </div>
+                <span className="w-6 text-xs font-black tabular-nums">{Math.ceil(left / 1000)}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* العصوان ملفوفتان على الطرفين، وعليهما القطعتان */}
+        {(["left", "right"] as const).map((side) => {
+          const color = side === "left" ? p.by : foe;
+          const piece = side === "left" ? p.piece : p.captured;
+          return (
+            <div
+              key={side}
+              className={`scroll-rod-${side} scroll-rod absolute -bottom-1 -top-1 w-[5%] rounded-full`}
+              style={{ [side]: 0 }}
+            >
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src={img(color, piece)}
+                alt={PIECE_NAME[piece]}
+                className={`scroll-piece absolute -top-[min(15vw,72px)] h-[min(21vw,100px)] w-[min(21vw,100px)] max-w-none drop-shadow-[0_6px_6px_#000c] ${
+                  side === "left" ? "-left-[min(8vw,38px)]" : "-right-[min(8vw,38px)]"
+                }`}
+              />
+            </div>
           );
         })}
       </div>
-      {c.phase === "question" ? (
-        <p className="text-sm text-indigo-200">
-          {(["w", "b"] as const).map((col) => `${COLOR_NAME[col]}: ${c.answered[col] ? "✅ أجاب" : "⏳"}`).join(" • ")}
-        </p>
-      ) : (
-        reveal && (
-          <p className={`text-lg font-black ${reveal.ok ? "text-emerald-300" : "text-rose-300"}`}>
-            {reveal.ok
-              ? p.k < p.need
-                ? `✅ صح! السؤال التالي (${p.k + 1} من ${p.need})`
-                : `✅ صح! ${PIECE_NAME[p.captured]} تُؤكل`
-              : reveal[p.by === "w" ? "w_ok" : "b_ok"]
-                ? `🛡️ ${COLOR_NAME[p.by === "w" ? "b" : "w"]} أجاب صح أسرع! الحركة أُلغيت`
-                : "❌ خطأ! الحركة أُلغيت"}
-          </p>
-        )
-      )}
     </div>
   );
 }
@@ -665,28 +730,30 @@ function HostControls({
 /** رابط صورة من public/chess (مع مسار النشر على GitHub Pages) */
 export const chessImg = (file: string) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/chess/${file}`;
 
-// مكان المربعات الـ 64 داخل صورة اللوحة (board.jpeg مقاسها 1254×1254)
+// مكان المربعات الـ 64 داخل صورة اللوحة (board.jpeg مقاسها 1080×1080)
+const BOARD_PX = 1080;
+const AREA = { x: 90, y: 72, w: 901, h: 912 };
 const BOARD_AREA = {
-  left: `${(105 / 1254) * 100}%`,
-  top: `${(84 / 1254) * 100}%`,
-  width: `${(1045 / 1254) * 100}%`,
-  height: `${(1058 / 1254) * 100}%`,
+  left: `${(AREA.x / BOARD_PX) * 100}%`,
+  top: `${(AREA.y / BOARD_PX) * 100}%`,
+  width: `${(AREA.w / BOARD_PX) * 100}%`,
+  height: `${(AREA.h / BOARD_PX) * 100}%`,
 };
 
 /** للاعب الأسود اللوحة مقلوبة: نغطي حروف وأرقام الإطار ونكتبها بترتيبه */
 function FlippedLabels() {
-  const cell = (i: number, size: number, start: number) => `${((start + size * (i + 0.5)) / 1254) * 100}%`;
+  const cell = (i: number, size: number, start: number) => `${((start + size * (i + 0.5)) / BOARD_PX) * 100}%`;
   const label =
     "absolute -translate-x-1/2 -translate-y-1/2 rounded bg-[#151515] px-1.5 font-serif text-[min(4vw,20px)] text-[#d4a84b]";
   return (
     <div className="pointer-events-none absolute inset-0">
       {Array.from({ length: 8 }, (_, i) => (
-        <span key={`r${i}`} className={label} style={{ left: "5.1%", top: cell(i, 132.25, 84) }}>
+        <span key={`r${i}`} className={label} style={{ left: "5.1%", top: cell(i, AREA.h / 8, AREA.y) }}>
           {i + 1}
         </span>
       ))}
       {Array.from({ length: 8 }, (_, i) => (
-        <span key={`f${i}`} className={label} style={{ left: cell(i, 130.6, 105), top: "94.1%" }}>
+        <span key={`f${i}`} className={label} style={{ left: cell(i, AREA.w / 8, AREA.x), top: "94%" }}>
           {"HGFEDCBA"[i]}
         </span>
       ))}
