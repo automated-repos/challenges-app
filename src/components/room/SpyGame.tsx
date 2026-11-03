@@ -5,7 +5,6 @@ import { errorMessage, getSupabase } from "@/lib/supabase";
 import { sounds } from "@/lib/sound";
 import type { Player, Room, SpyState } from "@/lib/types";
 import { Avatar, ErrorBox } from "../ui";
-import { msLeft, TimerBar, useServerNow } from "./QuestionView";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -17,26 +16,21 @@ interface Card {
   partners: number | null;
 }
 
-// مدة المراحل بالثواني (يجب أن تطابق 0023_spy.sql)
-const GUESS_SECONDS = 25;
-const ROUND_END_SECONDS = 12;
-
 export function SpyGame({
   room,
   players,
   userId,
   isHost,
-  offset,
   call,
 }: {
   room: Room;
   players: Player[];
   userId: string;
   isHost: boolean;
-  offset: RefObject<number>;
+  /** غير مستخدم (لا وقت في اللعبة) */
+  offset?: RefObject<number>;
   call: Call;
 }) {
-  const now = useServerNow(offset);
   const s = room.spy!;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -61,14 +55,8 @@ export function SpyGame({
     }
   }
 
-  const total =
-    s.phase === "hints"
-      ? room.question_seconds
-      : s.phase === "voting"
-        ? room.answer_seconds
-        : s.phase === "guess"
-          ? GUESS_SECONDS
-          : ROUND_END_SECONDS;
+  const order = s.order ?? [];
+  const turn = s.turn ?? 0;
 
   return (
     <section className="mx-auto w-full max-w-2xl space-y-3">
@@ -79,19 +67,23 @@ export function SpyGame({
         <span>
           المجال: <b className="text-white">{s.category}</b>
         </span>
-        {s.phase === "hints" && s.hint_rounds > 1 && (
-          <span>
-            دورة التلميح {s.hint_round} من {s.hint_rounds}
-          </span>
-        )}
         {(s.spy_count ?? 1) > 1 && <span>👥 جاسوسان هذه الجولة</span>}
       </div>
 
       <SecretCard card={card} />
 
       <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-4">
-        {s.phase === "hints" && (
-          <Hints s={s} userId={userId} label={label} busy={busy} onHint={(t) => act("spy_hint", { p_text: t })} />
+        {s.phase === "questions" && (
+          <Questions
+            order={order}
+            turn={turn}
+            userId={userId}
+            isHost={isHost}
+            label={label}
+            busy={busy}
+            onNext={() => act("spy_next_pair")}
+            onVote={() => act("spy_start_vote")}
+          />
         )}
         {s.phase === "voting" && (
           <Voting
@@ -107,16 +99,30 @@ export function SpyGame({
         )}
         {s.phase === "round_end" && <RoundEnd s={s} userId={userId} label={label} />}
         {error && <ErrorBox>{error}</ErrorBox>}
-        <TimerBar seconds={msLeft(room.question_deadline, now)} total={total} />
+
+        {/* أزرار صاحب الغرفة: لا وقت في اللعبة، هو من ينقلها للمرحلة التالية */}
+        {isHost && s.phase === "voting" && (
+          <button onClick={() => act("skip_question")} disabled={busy} className="btn-ghost w-full">
+            ⏹️ إنهاء التصويت وفرز الأصوات
+          </button>
+        )}
+        {isHost && s.phase === "guess" && (
+          <button onClick={() => act("skip_question")} disabled={busy} className="btn-ghost w-full">
+            ⏭️ إنهاء التخمين (يُحسب خطأ)
+          </button>
+        )}
+        {s.phase === "round_end" &&
+          (isHost ? (
+            <button onClick={() => act("skip_question")} disabled={busy} className="btn-primary w-full">
+              {(s.round ?? 0) < room.total_questions ? "▶️ الجولة التالية" : "🏁 النتيجة النهائية"}
+            </button>
+          ) : (
+            <p className="text-center text-sm text-indigo-200">⏳ بانتظار صاحب الغرفة للجولة التالية</p>
+          ))}
       </div>
 
-      {s.phase !== "hints" && (s.hints?.length ?? 0) > 0 && <HintList s={s} label={label} />}
-
       {isHost && (
-        <div className="flex flex-wrap justify-center gap-2">
-          <button onClick={() => act("skip_question")} className="btn-ghost" title="لصاحب دور غائب مثلاً">
-            ⏭️ تخطي المرحلة
-          </button>
+        <div className="flex justify-center">
           <button
             onClick={() => {
               if (confirm("إنهاء اللعبة الآن؟")) act("end_game");
@@ -181,98 +187,84 @@ function SecretCard({ card }: { card: Card | null }) {
   );
 }
 
-function Hints({
-  s,
+/** من يسأل من: كل لاعب يسأل التالي في الترتيب (السؤال في الغرفة الصوتية) */
+function Questions({
+  order,
+  turn,
   userId,
+  isHost,
   label,
   busy,
-  onHint,
+  onNext,
+  onVote,
 }: {
-  s: SpyState;
+  order: string[];
+  turn: number;
   userId: string;
+  isHost: boolean;
   label: (uid: string | null | undefined) => string;
   busy: boolean;
-  onHint: (text: string) => void;
+  onNext: () => void;
+  onVote: () => void;
 }) {
-  const [text, setText] = useState("");
-  const order = s.order ?? [];
-  const current = order[s.turn ?? 0];
-  const myTurn = current === userId;
+  const n = order.length;
+  const done = turn >= n;
+  const asker = order[turn];
+  const target = order[(turn + 1) % n];
+  const canNext = !done && (asker === userId || isHost);
 
   return (
     <div className="space-y-3">
-      <p className="text-center text-lg font-black">
-        {myTurn ? "💬 دورك! لمّح للكلمة" : `⏳ دور ${label(current)} للتلميح`}
-      </p>
-      {myTurn && (
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            onHint(text);
-            setText("");
-          }}
-          className="flex flex-wrap gap-2"
-        >
-          <input
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            maxLength={60}
-            placeholder="اكتب تلميحك (كلمة أو جملة قصيرة)"
-            className="input min-w-0 flex-1"
-            autoFocus
-          />
-          <button disabled={busy || !text.trim()} className="btn-primary">
-            إرسال
-          </button>
-          <button type="button" disabled={busy} onClick={() => onHint("")} className="btn-ghost w-full sm:w-auto">
-            🎤 قلتها في الصوت
-          </button>
-        </form>
-      )}
-      <ol className="space-y-1.5">
-        {order.map((uid, i) => {
-          const mine = (s.hints ?? []).filter((h) => h.u === uid);
-          const active = i === s.turn;
-          return (
-            <li
-              key={uid}
-              className={`flex flex-wrap items-center gap-2 rounded-xl px-3 py-2 text-sm ${
-                active ? "bg-amber-400/20 ring-2 ring-amber-300" : "bg-black/15"
-              } ${uid === userId ? "font-bold" : ""}`}
-            >
-              <span className="w-28 truncate">{label(uid)}</span>
-              {mine.map((h, k) => (
-                <span key={k} className="rounded-full bg-white/10 px-2.5 py-0.5">
-                  {h.t || (h.timeout ? "⏰ فات دوره" : "🎤 قالها في الصوت")}
-                </span>
-              ))}
-              {active && <span className="animate-pulse text-amber-200">✍️</span>}
-            </li>
-          );
-        })}
-      </ol>
-    </div>
-  );
-}
-
-/** كل التلميحات (للرجوع إليها أثناء التصويت والتخمين) */
-function HintList({ s, label }: { s: SpyState; label: (uid: string | null | undefined) => string }) {
-  const order = s.order ?? [];
-  return (
-    <div className="space-y-1.5 rounded-3xl border border-white/10 bg-white/5 p-4">
-      <h3 className="font-black text-amber-300">💬 التلميحات</h3>
-      {order.map((uid) => (
-        <div key={uid} className="flex flex-wrap items-center gap-2 text-sm">
-          <span className="w-28 truncate text-indigo-200">{label(uid)}</span>
-          {(s.hints ?? [])
-            .filter((h) => h.u === uid)
-            .map((h, k) => (
-              <span key={k} className="rounded-full bg-white/10 px-2.5 py-0.5">
-                {h.t || (h.timeout ? "⏰" : "🎤")}
-              </span>
-            ))}
+      {done ? (
+        <p className="text-center text-lg font-black">✅ انتهت الأسئلة! حان وقت التصويت</p>
+      ) : (
+        <div className="rounded-2xl bg-amber-400/15 p-4 text-center ring-2 ring-amber-300/60">
+          <p className="text-xs text-indigo-200">
+            السؤال {turn + 1} من {n} • في الغرفة الصوتية 🎤
+          </p>
+          <p className="mt-1 text-2xl font-black">
+            {label(asker)} <span className="text-amber-300">يسأل</span> {label(target)}
+          </p>
+          {asker === userId && (
+            <p className="mt-1 text-sm text-amber-100">دورك! اسأل سؤالاً يكشف الجاسوس دون أن تفضح الكلمة</p>
+          )}
+          {target === userId && <p className="mt-1 text-sm text-amber-100">سيسألك الآن، أجب بذكاء</p>}
         </div>
-      ))}
+      )}
+
+      {canNext && (
+        <button onClick={onNext} disabled={busy} className="btn-primary w-full">
+          ✅ تم السؤال، التالي
+        </button>
+      )}
+
+      <ol className="grid gap-1.5 sm:grid-cols-2">
+        {order.map((uid, i) => (
+          <li
+            key={uid}
+            className={`flex items-center gap-2 rounded-xl px-3 py-1.5 text-sm ${
+              i === turn ? "bg-amber-400/20" : i < turn ? "bg-black/15 opacity-60" : "bg-black/15"
+            }`}
+          >
+            <span>{i < turn ? "✅" : i === turn ? "🎤" : "⏳"}</span>
+            <span className="truncate">
+              {label(uid)} ← {label(order[(i + 1) % n])}
+            </span>
+          </li>
+        ))}
+      </ol>
+
+      {isHost ? (
+        <button
+          onClick={onVote}
+          disabled={busy}
+          className={`w-full ${done ? "btn-primary animate-pulse" : "btn-ghost"}`}
+        >
+          🗳️ ابدأ التصويت الآن
+        </button>
+      ) : (
+        done && <p className="text-center text-sm text-indigo-200">⏳ بانتظار صاحب الغرفة لبدء التصويت</p>
+      )}
     </div>
   );
 }
@@ -298,7 +290,7 @@ function Voting({
     <div className="space-y-3">
       <p className="text-center text-lg font-black">🗳️ من الجاسوس؟</p>
       <p className="text-center text-xs text-indigo-200">
-        صوّت على من تشك فيه (يمكنك تغيير صوتك حتى ينتهي الوقت). صوّت {voted.size} من {players.length}
+        صوّت على من تشك فيه (يمكنك تغيير صوتك حتى ينتهي التصويت). صوّت {voted.size} من {players.length}
       </p>
       <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
         {sorted.map((p) => {

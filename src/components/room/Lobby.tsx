@@ -138,14 +138,12 @@ export function Lobby({
               <span>🕵️ الجاسوس</span>
               <span>{room.total_questions} جولات</span>
               <span>{room.spy?.spies === 2 ? "جاسوسان (من 6 لاعبين)" : "جاسوس واحد"}</span>
-              <span>{room.spy?.hint_rounds} دورات تلميح</span>
               <span>
                 {room.spy?.custom
                   ? `كلمات خاصة (${room.spy.custom.length})`
                   : room.spy?.categories?.join("، ") || "كل المجالات"}
               </span>
-              <span>{room.question_seconds} ث للتلميح</span>
-              <span>{room.answer_seconds} ث للتصويت</span>
+              <span>🎤 الأسئلة في الغرفة الصوتية بلا وقت</span>
             </>
           ) : room.game === "pirate" ? (
             <>

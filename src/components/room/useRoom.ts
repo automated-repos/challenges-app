@@ -149,10 +149,8 @@ function newer(prev: Room | null, next: Room): Room {
 
 export function currentDeadline(room: Room): number | null {
   if (room.game === "spy") {
-    if (room.status !== "playing" || !room.question_deadline) return null;
-    // ثانية سماح للتلميح والتخمين (نفس القاعدة)
-    const phase = room.spy?.phase;
-    return Date.parse(room.question_deadline) + (phase === "hints" || phase === "guess" ? 1000 : 0);
+    // لا وقت في الجاسوس: صاحب الغرفة ينقل المراحل
+    return null;
   }
   if (room.game === "pirate") {
     if (room.status !== "playing" || !room.question_deadline) return null;

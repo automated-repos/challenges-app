@@ -193,7 +193,7 @@ export interface SpyState {
   categories: string[] | null;
   custom: string[] | null;
   round?: number;
-  phase?: "hints" | "voting" | "guess" | "round_end" | "done";
+  phase?: "questions" | "voting" | "guess" | "round_end" | "done";
   category?: string;
   spy_count?: number;
   order?: string[];

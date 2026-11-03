@@ -259,9 +259,6 @@ function SpyForm() {
   const [custom, setCustom] = useState("");
   const [rounds, setRounds] = useState(3);
   const [spies, setSpies] = useState(1);
-  const [hintRounds, setHintRounds] = useState(2);
-  const [hintSeconds, setHintSeconds] = useState(30);
-  const [voteSeconds, setVoteSeconds] = useState(45);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -291,9 +288,6 @@ function SpyForm() {
       const { data, error } = await getSupabase().rpc("create_spy_room", {
         p_rounds: rounds,
         p_spies: spies,
-        p_hint_rounds: hintRounds,
-        p_hint_seconds: hintSeconds,
-        p_vote_seconds: voteSeconds,
         p_categories: !useCustom && selected.length ? selected : null,
         p_custom: useCustom ? customWords : null,
       });
@@ -308,8 +302,9 @@ function SpyForm() {
   return (
     <form onSubmit={submit} className="space-y-5">
       <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
-        🕵️ الجميع يعرف الكلمة السرية إلا الجاسوس (والكل يعرف المجال). بالدور يلمّح كل لاعب للكلمة كتابةً أو في الصوت، ثم
-        يصوّت الجميع على الجاسوس. إن كُشف يحاول تخمين الكلمة لينجو. من 3 لاعبين.
+        🕵️ الجميع يعرف الكلمة السرية إلا الجاسوس (والكل يعرف المجال). بعد رؤية البطاقات يقترح التطبيق بالدور من يسأل من
+        في الغرفة الصوتية، بلا وقت محدد، ثم يبدأ صاحب الغرفة التصويت. إن كُشف الجاسوس يحاول تخمين الكلمة لينجو. من 3
+        لاعبين.
         <br />
         الجاسوس الناجي +30، الجاسوس المكشوف الذي خمّن +20، ومن صوّت على الجاسوس +10.
       </p>
@@ -363,9 +358,6 @@ function SpyForm() {
 
       <div className="grid grid-cols-2 gap-4">
         <NumberField label="عدد الجولات" value={rounds} onChange={setRounds} min={1} max={10} />
-        <NumberField label="دورات التلميح" value={hintRounds} onChange={setHintRounds} min={1} max={3} />
-        <NumberField label="ثواني كل تلميح" value={hintSeconds} onChange={setHintSeconds} min={15} max={90} />
-        <NumberField label="ثواني التصويت" value={voteSeconds} onChange={setVoteSeconds} min={20} max={120} />
       </div>
       {error && <ErrorBox>{error}</ErrorBox>}
       <button disabled={busy || (useCustom && customWords.length < 4)} className="btn-primary w-full">
