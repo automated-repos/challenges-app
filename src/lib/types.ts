@@ -136,7 +136,16 @@ export interface ChessState {
     k: number;
   } | null;
   answered: Record<ChessColor, boolean>;
-  reveal: { w: number | null; b: number | null; w_ok: boolean; b_ok: boolean; correct: number; ok: boolean } | null;
+  /** first: الأسرع إن أجاب القائدان صح */
+  reveal: {
+    w: number | null;
+    b: number | null;
+    w_ok: boolean;
+    b_ok: boolean;
+    correct: number;
+    ok: boolean;
+    first?: ChessColor | null;
+  } | null;
   moves: string[];
   last_move: { from: string; to: string } | null;
   result: { winner: ChessColor | null; reason: string } | null;

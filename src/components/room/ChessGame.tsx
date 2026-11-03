@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type RefObject } from "react";
 import { Chess, type Square } from "chess.js";
 import { errorMessage, getSupabase } from "@/lib/supabase";
 import { sounds } from "@/lib/sound";
@@ -18,8 +18,6 @@ interface Suggestion {
 }
 
 const FILES = "abcdefgh";
-// نفس الرموز المصمتة للونين (أوضح على المربعات)، ولونها يحدده CSS. ︎ = عرض نصي لا إيموجي
-const GLYPH: Record<string, string> = { k: "♚", q: "♛", r: "♜", b: "♝", n: "♞", p: "♟︎" };
 const PIECE_NAME: Record<string, string> = {
   k: "الملك",
   q: "الوزير",
@@ -67,7 +65,10 @@ export function ChessGame({
 }) {
   const now = useServerNow(offset);
   const c = room.chess!;
-  const game = useMemo(() => new Chess(c.fen), [c.fen]);
+  // حركة القائد تظهر فوراً على شاشته (قبل رد الخادم)، وتُلغى تلقائياً عند وصول وضع جديد أو عند الخطأ
+  const [optimistic, setOptimistic] = useState<{ base: string; fen: string } | null>(null);
+  const fen = optimistic && optimistic.base === c.fen ? optimistic.fen : c.fen;
+  const game = useMemo(() => new Chess(fen), [fen]);
   const turn = game.turn() as ChessColor;
   const mine = colorOf(c, userId, players);
   const isCaptain = mine != null && c.sides[mine].captain === userId;
@@ -87,6 +88,12 @@ export function ChessGame({
     setError("");
     try {
       if (isCaptain) {
+        // الأكل الذي يحتاج سؤالاً لا يُعرض مسبقاً (قد يُلغى)
+        try {
+          const g = new Chess(c.fen);
+          const m = g.move({ from, to, promotion });
+          if (!m.captured || m.captured === "p") setOptimistic({ base: c.fen, fen: g.fen() });
+        } catch {}
         const { error } = await getSupabase().functions.invoke("chess-move", {
           body: { roomId: room.id, from, to, promotion },
         });
@@ -95,6 +102,7 @@ export function ChessGame({
         await call("chess_suggest", { p_from: from, p_to: to });
       }
     } catch (e) {
+      setOptimistic(null);
       setError(errorMessage(e));
     } finally {
       setBusy(false);
@@ -125,15 +133,19 @@ export function ChessGame({
     <section className="mx-auto w-full max-w-2xl space-y-3">
       <SideBar c={c} color={mine === "w" ? "b" : "w"} turn={turn} players={players} name={name} />
 
-      <Board
-        game={game}
-        c={c}
-        flipped={mine === "b"}
-        interactive={canAct && !busy}
-        suggestions={c.phase === "move" && mine === turn ? suggestions : []}
-        name={name}
-        onMove={play}
-      />
+      <div className="relative">
+        <Board
+          game={game}
+          fen={fen}
+          c={c}
+          flipped={mine === "b"}
+          interactive={canAct && !busy}
+          suggestions={c.phase === "move" && mine === turn ? suggestions : []}
+          name={name}
+          onMove={play}
+        />
+        <CaptureShow c={c} />
+      </div>
 
       <SideBar c={c} color={mine === "b" ? "b" : "w"} turn={turn} players={players} name={name} />
 
@@ -217,14 +229,13 @@ function SideBar({
       )}
       <span className="ms-auto text-lg leading-none tracking-tight" dir="ltr">
         {taken.map((p, i) => (
-          <span
+          // eslint-disable-next-line @next/next/no-img-element
+          <img
             key={i}
-            className={
-              color === "w" ? "text-slate-900 [text-shadow:0_0_2px_#fff]" : "text-white [text-shadow:0_0_2px_#000]"
-            }
-          >
-            {GLYPH[p]}
-          </span>
+            src={chessImg(`pieces/${color === "w" ? "b" : "w"}${p}.png`)}
+            alt={PIECE_NAME[p]}
+            className="-mx-1 inline-block h-6 w-6"
+          />
         ))}
       </span>
     </div>
@@ -248,6 +259,7 @@ function capturedBy(fen: string, color: ChessColor): string[] {
 
 function Board({
   game,
+  fen: boardFen,
   c,
   flipped,
   interactive,
@@ -256,6 +268,7 @@ function Board({
   onMove,
 }: {
   game: Chess;
+  fen: string;
   c: ChessState;
   flipped: boolean;
   interactive: boolean;
@@ -267,12 +280,13 @@ function Board({
   const [promo, setPromo] = useState<{ from: string; to: string } | null>(null);
 
   // اللوحة تغيّرت: إلغاء الاختيار
-  const [fen, setFen] = useState(c.fen);
-  if (fen !== c.fen) {
-    setFen(c.fen);
+  const [fen, setFen] = useState(boardFen);
+  if (fen !== boardFen) {
+    setFen(boardFen);
     setSelected(null);
     setPromo(null);
   }
+  const pieces = useTrackedPieces(boardFen);
 
   const turn = game.turn();
   const targets = selected ? game.moves({ square: selected, verbose: true }) : [];
@@ -309,100 +323,122 @@ function Board({
   };
 
   return (
-    <div className="relative mx-auto w-full max-w-[480px] select-none" dir="ltr">
-      <div className="grid grid-cols-8 overflow-hidden rounded-xl border-4 border-amber-900/70 shadow-2xl">
-        {rows.map((r) =>
-          cols.map((f) => {
-            const sq = `${f}${r}` as Square;
-            const piece = game.get(sq);
-            const dark = (FILES.indexOf(f) + r) % 2 === 1;
-            const last = c.last_move && (c.last_move.from === sq || c.last_move.to === sq);
-            const attacking = pendingTo && (pendingTo.from === sq || pendingTo.to === sq);
+    <div
+      className="relative mx-auto aspect-square w-full max-w-[480px] select-none overflow-hidden rounded-lg bg-cover shadow-2xl"
+      style={{ backgroundImage: `url(${chessImg("board.jpeg")})` }}
+      dir="ltr"
+    >
+      {/* حروف وأرقام الإطار مرسومة للأبيض؛ للأسود نغطيها بترتيبه */}
+      {flipped && <FlippedLabels />}
+
+      {/* منطقة اللعب فوق مربعات الصورة تماماً */}
+      <div className="absolute" style={BOARD_AREA}>
+        <div className="grid h-full w-full grid-cols-8 grid-rows-8">
+          {rows.map((r) =>
+            cols.map((f) => {
+              const sq = `${f}${r}` as Square;
+              const piece = game.get(sq);
+              const last = c.last_move && (c.last_move.from === sq || c.last_move.to === sq);
+              const attacking = pendingTo && (pendingTo.from === sq || pendingTo.to === sq);
+              return (
+                <button
+                  key={sq}
+                  onClick={() => click(sq)}
+                  className={`relative ${interactive ? "cursor-pointer" : "cursor-default"}`}
+                  aria-label={sq}
+                >
+                  {last && <span className="absolute inset-0 bg-amber-400/35" />}
+                  {attacking && <span className="absolute inset-0 animate-pulse bg-rose-500/45" />}
+                  {checkSquare === sq && <span className="absolute inset-0 bg-red-600/55" />}
+                  {selected === sq && <span className="absolute inset-0 bg-emerald-400/45" />}
+                  {targetSet.has(sq) && (
+                    <span
+                      className={`absolute rounded-full ${
+                        piece
+                          ? "inset-[6%] border-4 border-emerald-500/80"
+                          : "left-[37%] top-[37%] h-[26%] w-[26%] bg-emerald-500/60"
+                      }`}
+                    />
+                  )}
+                </button>
+              );
+            }),
+          )}
+        </div>
+
+        {/* القطع: طبقة فوق المربعات، كل قطعة تنزلق لمكانها الجديد بسلاسة */}
+        <div className="pointer-events-none absolute inset-0">
+          {pieces.map((pc) => {
+            const f = FILES.indexOf(pc.sq[0]);
+            const r = Number(pc.sq[1]);
+            const x = flipped ? 7 - f : f;
+            const y = flipped ? r - 1 : 8 - r;
             return (
-              <button
-                key={sq}
-                onClick={() => click(sq)}
-                className={`relative flex aspect-square items-center justify-center text-[min(9vw,44px)] leading-none ${
-                  dark ? "bg-[#b58863]" : "bg-[#f0d9b5]"
-                } ${interactive ? "cursor-pointer" : "cursor-default"}`}
-              >
-                {last && <span className="absolute inset-0 bg-yellow-300/40" />}
-                {attacking && <span className="absolute inset-0 animate-pulse bg-rose-500/45" />}
-                {checkSquare === sq && <span className="absolute inset-0 bg-red-600/60" />}
-                {selected === sq && <span className="absolute inset-0 bg-emerald-400/50" />}
-                {piece && (
-                  <span
-                    className={`relative ${
-                      piece.color === "w"
-                        ? "text-white [text-shadow:0_0_2px_#000,0_0_1px_#000]"
-                        : "text-slate-900 [text-shadow:0_0_1px_#fff]"
-                    }`}
-                  >
-                    {GLYPH[piece.type]}
-                  </span>
-                )}
-                {targetSet.has(sq) && (
-                  <span
-                    className={`absolute rounded-full ${
-                      piece ? "inset-1 border-4 border-emerald-600/70" : "h-1/4 w-1/4 bg-emerald-700/50"
-                    }`}
-                  />
-                )}
-                {/* إحداثيات على الحافة */}
-                {f === cols[0] && <span className="absolute left-0.5 top-0 text-[9px] text-black/50">{r}</span>}
-                {r === rows[7] && <span className="absolute bottom-0 right-1 text-[9px] text-black/50">{f}</span>}
-              </button>
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                key={pc.id}
+                src={chessImg(`pieces/${pc.color}${pc.type}.png`)}
+                alt=""
+                draggable={false}
+                className="absolute left-0 top-0 h-[12.5%] w-[12.5%] drop-shadow-[0_3px_3px_rgba(0,0,0,0.55)]"
+                style={{
+                  transform: `translate(${x * 100}%, ${y * 100}%) scale(${pc.gone ? 0.3 : 1})`,
+                  opacity: pc.gone ? 0 : 1,
+                  transition: "transform 280ms cubic-bezier(0.22, 1, 0.36, 1), opacity 220ms ease-out",
+                  zIndex: pc.gone ? 0 : 1,
+                }}
+              />
             );
-          }),
+          })}
+        </div>
+
+        {/* أسهم اقتراحات الفريق بأسماء أصحابها */}
+        {suggestions.length > 0 && (
+          <svg viewBox="0 0 8 8" className="pointer-events-none absolute inset-0 z-10">
+            <defs>
+              <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3" markerHeight="3" orient="auto">
+                <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" />
+              </marker>
+            </defs>
+            {suggestions.map((s) => {
+              const [x1, y1] = center(s.from_sq);
+              const [x2, y2] = center(s.to_sq);
+              return (
+                <g key={s.user_id}>
+                  <line
+                    x1={x1}
+                    y1={y1}
+                    x2={x2}
+                    y2={y2}
+                    stroke="#f59e0b"
+                    strokeWidth={0.13}
+                    strokeOpacity={0.85}
+                    markerEnd="url(#arrow)"
+                  />
+                  <text
+                    x={x2}
+                    y={y2 - 0.38}
+                    fontSize={0.26}
+                    textAnchor="middle"
+                    fill="#fff"
+                    stroke="#000"
+                    strokeWidth={0.05}
+                    paintOrder="stroke"
+                    fontWeight="bold"
+                  >
+                    {name(s.user_id)}
+                  </text>
+                </g>
+              );
+            })}
+          </svg>
         )}
       </div>
 
-      {/* أسهم اقتراحات الفريق بأسماء أصحابها */}
-      {suggestions.length > 0 && (
-        <svg viewBox="0 0 8 8" className="pointer-events-none absolute inset-1">
-          <defs>
-            <marker id="arrow" viewBox="0 0 10 10" refX="5" refY="5" markerWidth="3" markerHeight="3" orient="auto">
-              <path d="M0,0 L10,5 L0,10 z" fill="#f59e0b" />
-            </marker>
-          </defs>
-          {suggestions.map((s) => {
-            const [x1, y1] = center(s.from_sq);
-            const [x2, y2] = center(s.to_sq);
-            return (
-              <g key={s.user_id}>
-                <line
-                  x1={x1}
-                  y1={y1}
-                  x2={x2}
-                  y2={y2}
-                  stroke="#f59e0b"
-                  strokeWidth={0.13}
-                  strokeOpacity={0.85}
-                  markerEnd="url(#arrow)"
-                />
-                <text
-                  x={x2}
-                  y={y2 - 0.38}
-                  fontSize={0.26}
-                  textAnchor="middle"
-                  fill="#fff"
-                  stroke="#000"
-                  strokeWidth={0.05}
-                  paintOrder="stroke"
-                  fontWeight="bold"
-                >
-                  {name(s.user_id)}
-                </text>
-              </g>
-            );
-          })}
-        </svg>
-      )}
-
       {/* اختيار الترقية */}
       {promo && (
-        <div className="absolute inset-0 flex items-center justify-center rounded-xl bg-black/60">
-          <div className="flex gap-2 rounded-2xl bg-white p-3">
+        <div className="absolute inset-0 z-20 flex items-center justify-center bg-black/60">
+          <div className="flex gap-2 rounded-2xl border border-amber-400/60 bg-slate-950/90 p-3">
             {(["q", "r", "b", "n"] as const).map((p) => (
               <button
                 key={p}
@@ -410,10 +446,11 @@ function Board({
                   onMove(promo.from, promo.to, p);
                   setPromo(null);
                 }}
-                className="rounded-xl bg-slate-200 px-3 py-1 text-4xl text-slate-900 hover:bg-amber-300"
+                className="rounded-xl bg-white/10 p-1 hover:bg-amber-400/40"
                 title={PIECE_NAME[p]}
               >
-                {GLYPH[p]}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={chessImg(`pieces/${turn}${p}.png`)} alt={PIECE_NAME[p]} className="h-14 w-14" />
               </button>
             ))}
           </div>
@@ -450,7 +487,9 @@ function CaptureQuestion({
   return (
     <div className="space-y-3">
       <p className="rounded-2xl bg-rose-500/15 px-3 py-2 text-sm">
-        {GLYPH[p.piece]} {COLOR_NAME[p.by]} ({sideName(c, p.by, players)}) يهاجم {PIECE_NAME[p.captured]}{" "}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={chessImg(`pieces/${p.by}${p.piece}.png`)} alt="" className="inline-block h-6 w-6 align-middle" />{" "}
+        {COLOR_NAME[p.by]} ({sideName(c, p.by, players)}) يهاجم {PIECE_NAME[p.captured]}{" "}
         <span dir="ltr">({p.san})</span>
         {p.need > 1 && (
           <b>
@@ -460,7 +499,7 @@ function CaptureQuestion({
         )}
         <br />
         <span className="text-xs text-indigo-200">
-          إجابة المهاجم الصحيحة = تُؤكل القطعة، والخاطئة = تُلغى الحركة. القائدان يجيبان.
+          إجابة المهاجم الصحيحة = تُؤكل القطعة، والخاطئة = تُلغى الحركة. وإن أجاب الاثنان صح، الأسرع يفوز.
         </span>
       </p>
       <p className="text-xs text-indigo-200">
@@ -510,7 +549,9 @@ function CaptureQuestion({
               ? p.k < p.need
                 ? `✅ صح! السؤال التالي (${p.k + 1} من ${p.need})`
                 : `✅ صح! ${PIECE_NAME[p.captured]} تُؤكل`
-              : "❌ خطأ! الحركة أُلغيت"}
+              : reveal[p.by === "w" ? "w_ok" : "b_ok"]
+                ? `🛡️ ${COLOR_NAME[p.by === "w" ? "b" : "w"]} أجاب صح أسرع! الحركة أُلغيت`
+                : "❌ خطأ! الحركة أُلغيت"}
           </p>
         )
       )}
@@ -621,6 +662,106 @@ function HostControls({
 
 // ---------- أدوات ----------
 
+/** رابط صورة من public/chess (مع مسار النشر على GitHub Pages) */
+export const chessImg = (file: string) => `${process.env.NEXT_PUBLIC_BASE_PATH ?? ""}/chess/${file}`;
+
+// مكان المربعات الـ 64 داخل صورة اللوحة (board.jpeg مقاسها 1254×1254)
+const BOARD_AREA = {
+  left: `${(105 / 1254) * 100}%`,
+  top: `${(84 / 1254) * 100}%`,
+  width: `${(1045 / 1254) * 100}%`,
+  height: `${(1058 / 1254) * 100}%`,
+};
+
+/** للاعب الأسود اللوحة مقلوبة: نغطي حروف وأرقام الإطار ونكتبها بترتيبه */
+function FlippedLabels() {
+  const cell = (i: number, size: number, start: number) => `${((start + size * (i + 0.5)) / 1254) * 100}%`;
+  const label =
+    "absolute -translate-x-1/2 -translate-y-1/2 rounded bg-[#151515] px-1.5 font-serif text-[min(4vw,20px)] text-[#d4a84b]";
+  return (
+    <div className="pointer-events-none absolute inset-0">
+      {Array.from({ length: 8 }, (_, i) => (
+        <span key={`r${i}`} className={label} style={{ left: "5.1%", top: cell(i, 132.25, 84) }}>
+          {i + 1}
+        </span>
+      ))}
+      {Array.from({ length: 8 }, (_, i) => (
+        <span key={`f${i}`} className={label} style={{ left: cell(i, 130.6, 105), top: "94.1%" }}>
+          {"HGFEDCBA"[i]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
+interface TrackedPiece {
+  id: number;
+  type: string;
+  color: "w" | "b";
+  sq: string;
+  /** أُكلت: تختفي تدريجياً في مكانها */
+  gone?: boolean;
+}
+
+const squareDistance = (a: string, b: string) =>
+  Math.abs(a.charCodeAt(0) - b.charCodeAt(0)) + Math.abs(Number(a[1]) - Number(b[1]));
+
+/**
+ * يعطي كل قطعة رقماً ثابتاً بين الأوضاع، حتى تنزلق من مربعها القديم للجديد بدل أن تختفي وتظهر.
+ * المطابقة: نفس النوع واللون، والأقرب مسافة (يغطي التبييت). العسكري المرقّى يصبح القطعة الجديدة.
+ */
+function trackPieces(prev: TrackedPiece[], fen: string, nextId: { current: number }): TrackedPiece[] {
+  const next = new Map<string, { type: string; color: "w" | "b" }>();
+  for (const row of new Chess(fen).board())
+    for (const p of row) if (p) next.set(p.square, { type: p.type, color: p.color });
+
+  const out: TrackedPiece[] = [];
+  const taken = new Set<string>();
+  let loose: TrackedPiece[] = [];
+  for (const p of prev) {
+    if (p.gone) continue;
+    const n = next.get(p.sq);
+    if (n && n.type === p.type && n.color === p.color && !taken.has(p.sq)) {
+      out.push(p);
+      taken.add(p.sq);
+    } else loose.push(p);
+  }
+
+  const unplaced: [string, { type: string; color: "w" | "b" }][] = [];
+  for (const [sq, n] of next) {
+    if (taken.has(sq)) continue;
+    const match = loose
+      .filter((p) => p.type === n.type && p.color === n.color)
+      .sort((a, b) => squareDistance(a.sq, sq) - squareDistance(b.sq, sq))[0];
+    if (match) {
+      out.push({ ...match, sq });
+      loose = loose.filter((p) => p !== match);
+    } else unplaced.push([sq, n]);
+  }
+  for (const [sq, n] of unplaced) {
+    // ترقية: العسكري نفسه يتحول للقطعة الجديدة
+    const pawn = loose.find((p) => p.type === "p" && p.color === n.color);
+    if (pawn) {
+      out.push({ ...pawn, sq, type: n.type });
+      loose = loose.filter((p) => p !== pawn);
+    } else out.push({ id: nextId.current++, sq, ...n });
+  }
+  for (const p of loose) out.push({ ...p, gone: true });
+  return out;
+}
+
+/** القطع بأرقام ثابتة؛ تُحدَّث عند تغيّر الوضع */
+function useTrackedPieces(fen: string): TrackedPiece[] {
+  const [nextId] = useState(() => ({ current: 1 }));
+  const [state, setState] = useState(() => ({ fen, pieces: trackPieces([], fen, nextId) }));
+  if (state.fen !== fen) {
+    const pieces = trackPieces(state.pieces, fen, nextId);
+    setState({ fen, pieces });
+    return pieces;
+  }
+  return state.pieces;
+}
+
 /** اقتراحات الفريق: تُحدّث كل ثانية ونصف أثناء دور الفريق */
 function useSuggestions(roomId: string, active: boolean, seq: number): Suggestion[] {
   const [list, setList] = useState<Suggestion[]>([]);
@@ -656,6 +797,72 @@ function useChessSounds(c: ChessState) {
     else if (e.type === "attack") sounds.buzz();
     else sounds.tick();
   }, [c.seq, c.last]);
+}
+
+// ---------- عرض الأكل ----------
+
+const SHOW_MS = 2800;
+const SPARKS = Array.from({ length: 12 }, (_, i) => i * 30);
+
+/** القطعة المهاجمة من رمز الحركة (Nxe5 ← n، exd5 ← p) */
+function attackerOf(san: string): string {
+  const ch = san[0];
+  return "KQRBN".includes(ch) ? ch.toLowerCase() : "p";
+}
+
+/** بعد نجاح الأكل: المهاجم يقفز على القطعة المأكولة فتتحطم، فوق اللوحة لثوانٍ */
+function CaptureShow({ c }: { c: ChessState }) {
+  const [show, setShow] = useState<{ key: number; attacker: string; victim: string; by: ChessColor } | null>(null);
+  // حدث جديد: نبدأ العرض (لا عرض لأكل حدث قبل فتح الصفحة)
+  const [seq, setSeq] = useState(c.seq);
+  if (seq !== c.seq) {
+    setSeq(c.seq);
+    const e = c.last;
+    if (e?.type === "captured" && e.captured) {
+      setShow({ key: c.seq, attacker: attackerOf(e.san), victim: e.captured, by: e.by });
+    }
+  }
+
+  useEffect(() => {
+    if (!show) return;
+    const id = setTimeout(() => setShow(null), SHOW_MS);
+    return () => clearTimeout(id);
+  }, [show]);
+
+  if (!show) return null;
+  const foe: ChessColor = show.by === "w" ? "b" : "w";
+  const size = "h-[min(26vw,130px)] w-[min(26vw,130px)]";
+  const img = (color: ChessColor, piece: string) => chessImg(`pieces/${color}${piece}.png`);
+
+  return (
+    <div
+      key={show.key}
+      onClick={() => setShow(null)}
+      className="capture-backdrop absolute inset-0 z-20 mx-auto flex max-w-[480px] cursor-pointer flex-col items-center justify-center overflow-hidden rounded-xl bg-black/65 backdrop-blur-[2px]"
+    >
+      <div className="relative flex h-1/2 w-1/2 items-center justify-center" dir="ltr">
+        <span className="capture-flash absolute h-full w-full rounded-full bg-[radial-gradient(circle,#fde68a_0%,#f59e0b80_40%,transparent_70%)]" />
+        {SPARKS.map((a) => (
+          <span
+            key={a}
+            style={{ "--a": `${a}deg` } as CSSProperties}
+            className="capture-spark absolute h-[12%] w-[3%] rounded-full bg-amber-300"
+          />
+        ))}
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={img(foe, show.victim)} alt="" className={`capture-victim absolute ${size}`} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={img(foe, show.victim)} alt="" className={`capture-half-left absolute ${size}`} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={img(foe, show.victim)} alt="" className={`capture-half-right absolute ${size}`} />
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={img(show.by, show.attacker)} alt="" className={`capture-attacker absolute ${size}`} />
+      </div>
+      <p className="capture-caption mt-2 rounded-2xl bg-amber-400 px-4 py-1.5 text-lg font-black text-black shadow-lg">
+        {PIECE_NAME[show.attacker]} {show.by === "w" ? "الأبيض" : "الأسود"} أكل {PIECE_NAME[show.victim]}! 💥
+      </p>
+    </div>
+  );
 }
 
 /** رسالة الخطأ التي أرسلتها الدالة بدل الرسالة العامة */

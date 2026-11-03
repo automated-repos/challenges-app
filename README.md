@@ -29,8 +29,9 @@
 19. [`supabase/migrations/0019_chess.sql`](supabase/migrations/0019_chess.sql): شطرنج الأسئلة
 20. [`supabase/migrations/0020_pirate.sql`](supabase/migrations/0020_pirate.sql): قرصان المعرفة
 21. [`supabase/migrations/0021_chess_service_role.sql`](supabase/migrations/0021_chess_service_role.sql): صلاحية قراءة الغرف لدالة chess-move
-22. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
-23. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
+22. [`supabase/migrations/0022_chess_fastest.sql`](supabase/migrations/0022_chess_fastest.sql): في الشطرنج إن أجاب القائدان صح يفوز الأسرع
+23. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+24. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
@@ -96,7 +97,7 @@ supabase functions deploy voice-token --no-verify-jwt
 ## شطرنج الأسئلة ♟️
 لعبة رابعة من تبويب "إنشاء مسابقة":
 - **لاعبان**، أو **فريقان**. في كل فريق **قائد** واحد يحرك (أول من دخل الغرفة، ومنشئ الغرفة يستطيع تغييره أثناء اللعب)، وباقي الفريق **يقترحون** حركات تظهر على لوحة القائد أسهماً بأسمائهم، ويستطيع القائد لعب أي اقتراح بضغطة. الخصم لا يرى اقتراحاتكم.
-- أكل **القلعة أو الفيل أو الحصان** = سؤال للقائدين، وأكل **الوزير** = 3 أسئلة متتالية. إن أجاب المهاجم صح (كل الأسئلة) تُؤكل القطعة، وإن أخطأ تُلغى الحركة وينتقل الدور للخصم (إلا إن كان المهاجم في كش فيبقى الدور له). أكل العسكري عادي.
+- أكل **القلعة أو الفيل أو الحصان** = سؤال للقائدين، وأكل **الوزير** = 3 أسئلة متتالية. إن أجاب المهاجم صح (كل الأسئلة) تُؤكل القطعة، وإن أخطأ تُلغى الحركة. وإن أجاب القائدان صح فالأفضلية **للأسرع**: المهاجم أسرع = تُؤكل القطعة، والمدافع أسرع = يُلغى الهجوم. عند الإلغاء ينتقل الدور للخصم (إلا إن كان المهاجم في كش فيبقى الدور له). أكل العسكري عادي.
 - لا ساعة للعبة، ولكل سؤال وقت. النقاط: الإجابة الصحيحة والخاطئة حسب إعدادات الغرفة (للقائدين)، والفوز بكش مات +30 لكل أعضاء الطرف الفائز، والتعادل +10 للجميع.
 - قانونية الحركات يتحقق منها الخادم في دالة [`chess-move`](supabase/functions/chess-move/index.ts)، فلا يمكن الغش بحركة غير قانونية. انشرها مرة واحدة:
 
