@@ -112,7 +112,9 @@ export function Lobby({
         : teamMode && teamCount !== 2 && !teamBlock
           ? "الشطرنج بين فريقين بالضبط"
           : "";
-  const canStart = !alone && !tooMany && !chessBlock && allReady && !teamBlock;
+  // الجاسوس من 3 لاعبين
+  const spyBlock = room.game === "spy" && players.length < 3 ? "الجاسوس تحتاج 3 لاعبين على الأقل" : "";
+  const canStart = !alone && !tooMany && !chessBlock && !spyBlock && allReady && !teamBlock;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -131,7 +133,21 @@ export function Lobby({
         </div>
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
-          {room.game === "pirate" ? (
+          {room.game === "spy" ? (
+            <>
+              <span>🕵️ الجاسوس</span>
+              <span>{room.total_questions} جولات</span>
+              <span>{room.spy?.spies === 2 ? "جاسوسان (من 6 لاعبين)" : "جاسوس واحد"}</span>
+              <span>{room.spy?.hint_rounds} دورات تلميح</span>
+              <span>
+                {room.spy?.custom
+                  ? `كلمات خاصة (${room.spy.custom.length})`
+                  : room.spy?.categories?.join("، ") || "كل المجالات"}
+              </span>
+              <span>{room.question_seconds} ث للتلميح</span>
+              <span>{room.answer_seconds} ث للتصويت</span>
+            </>
+          ) : room.game === "pirate" ? (
             <>
               <span>🏴‍☠️ قرصان المعرفة</span>
               <span>{room.pirate?.count ?? 10} جزر</span>
@@ -193,7 +209,7 @@ export function Lobby({
         </div>
       </section>
 
-      {isHost && room.game !== "stop" && <TeamSettings room={room} busy={busy} run={run} />}
+      {isHost && room.game !== "stop" && room.game !== "spy" && <TeamSettings room={room} busy={busy} run={run} />}
 
       {teamMode ? (
         <LobbyTeams room={room} players={players} userId={userId} busy={busy} run={run} />
@@ -260,6 +276,7 @@ export function Lobby({
           )}
           {teamBlock && <p className="text-center text-sm text-amber-200">👥 {teamBlock}</p>}
           {chessBlock && <p className="text-center text-sm text-amber-200">♟️ {chessBlock}</p>}
+          {spyBlock && !alone && <p className="text-center text-sm text-amber-200">🕵️ {spyBlock}</p>}
         </div>
       ) : (
         <div className="space-y-2">

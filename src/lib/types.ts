@@ -52,13 +52,15 @@ export interface Room {
   /** عدد الفرق في وضع الفرق */
   team_count: number | null;
   /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت أو لودو */
-  game: "quiz" | "stop" | "ludo" | "chess" | "pirate";
+  game: "quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy";
   /** حالة لودو (انظر 0016_ludo_quiz.sql) */
   ludo: LudoState | null;
   /** حالة الشطرنج (انظر 0019_chess.sql) */
   chess: ChessState | null;
   /** حالة قرصان المعرفة (انظر 0020_pirate.sql) */
   pirate: PirateState | null;
+  /** حالة الجاسوس (انظر 0023_spy.sql) */
+  spy: SpyState | null;
   /** أتوبيس كومبليت: الخانات وحرف الجولة */
   stop_categories: string[] | null;
   stop_letter: string | null;
@@ -182,6 +184,37 @@ export interface PirateState {
   seq: number;
   last: PirateEvent | null;
   log: PirateEvent[];
+}
+
+/** حالة الجاسوس (انظر 0023_spy.sql). الكلمة والجواسيس لا يظهرون إلا في result بعد نهاية الجولة */
+export interface SpyState {
+  spies: number;
+  hint_rounds: number;
+  categories: string[] | null;
+  custom: string[] | null;
+  round?: number;
+  phase?: "hints" | "voting" | "guess" | "round_end" | "done";
+  category?: string;
+  spy_count?: number;
+  order?: string[];
+  turn?: number;
+  hint_round?: number;
+  hints?: { u: string; t: string; r: number; timeout: boolean }[];
+  voted?: string[];
+  accused?: string | null;
+  options?: string[] | null;
+  result?: {
+    word: string;
+    category: string;
+    spies: string[];
+    votes: Record<string, string>;
+    accused: string | null;
+    caught: boolean;
+    guessed: boolean | null;
+    guess: string | null;
+    winner: "spies" | "town";
+  } | null;
+  seq?: number;
 }
 
 export interface Player {

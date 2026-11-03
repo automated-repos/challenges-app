@@ -35,7 +35,7 @@ interface Match {
   questions: number;
   categories: string[] | null;
   /** نوع اللعبة (قد يغيب في قواعد بيانات قديمة لم يُشغَّل فيها 0012) */
-  game?: "quiz" | "stop" | "ludo" | "chess" | "pirate";
+  game?: "quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy";
   players: MatchPlayer[];
 }
 
@@ -284,15 +284,17 @@ function MatchCard({ match, userId }: { match: Match; userId: string }) {
           </p>
           <p className="text-xs text-indigo-300">
             {match.finished_at ? dateFmt.format(new Date(match.finished_at)) : "—"} • {players.length} لاعبين •{" "}
-            {match.game === "pirate"
-              ? "🏴‍☠️ قرصان المعرفة"
-              : match.game === "chess"
-                ? "♟️ شطرنج"
-                : match.game === "ludo"
-                  ? "🎲 لودو"
-                  : match.game === "stop"
-                    ? `🚌 أتوبيس كومبليت • ${match.questions} جولات`
-                    : `${match.questions} أسئلة`}
+            {match.game === "spy"
+              ? "🕵️ الجاسوس"
+              : match.game === "pirate"
+                ? "🏴‍☠️ قرصان المعرفة"
+                : match.game === "chess"
+                  ? "♟️ شطرنج"
+                  : match.game === "ludo"
+                    ? "🎲 لودو"
+                    : match.game === "stop"
+                      ? `🚌 أتوبيس كومبليت • ${match.questions} جولات`
+                      : `${match.questions} أسئلة`}
             {me && <> • مركزك: {me.place}</>}
           </p>
         </div>

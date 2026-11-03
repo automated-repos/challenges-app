@@ -117,10 +117,10 @@ function JoinForm() {
 
 /** اختيار نوع اللعبة ثم إعداداتها */
 function CreateTab() {
-  const [game, setGame] = useState<"quiz" | "stop" | "ludo" | "chess" | "pirate">("quiz");
+  const [game, setGame] = useState<"quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy">("quiz");
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-5">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
         {(
           [
             { id: "quiz", icon: "🧠", name: "مسابقة أسئلة" },
@@ -128,6 +128,7 @@ function CreateTab() {
             { id: "ludo", icon: "🎲", name: "لودو" },
             { id: "chess", icon: "♟️", name: "شطرنج" },
             { id: "pirate", icon: "🏴‍☠️", name: "قرصان المعرفة" },
+            { id: "spy", icon: "🕵️", name: "الجاسوس" },
           ] as const
         ).map((g) => (
           <button
@@ -153,8 +154,10 @@ function CreateTab() {
         <LudoForm />
       ) : game === "chess" ? (
         <ChessForm />
-      ) : (
+      ) : game === "pirate" ? (
         <PirateForm />
+      ) : (
+        <SpyForm />
       )}
     </div>
   );
@@ -242,6 +245,130 @@ function LudoForm() {
       </div>
       {error && <ErrorBox>{error}</ErrorBox>}
       <button disabled={busy || !categories} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
+function SpyForm() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<{ category: string; words: number }[] | null>(null);
+  const [selected, setSelected] = useState<string[]>([]); // فارغة = الكل
+  const [useCustom, setUseCustom] = useState(false);
+  const [custom, setCustom] = useState("");
+  const [rounds, setRounds] = useState(3);
+  const [spies, setSpies] = useState(1);
+  const [hintRounds, setHintRounds] = useState(2);
+  const [hintSeconds, setHintSeconds] = useState(30);
+  const [voteSeconds, setVoteSeconds] = useState(45);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    getSupabase()
+      .rpc("spy_categories")
+      .then(({ data, error }) => {
+        if (error) setError(errorMessage(error));
+        else setCategories(data as { category: string; words: number }[]);
+      });
+  }, []);
+
+  const customWords = custom
+    .split(/[\n،,]+/)
+    .map((w) => w.trim())
+    .filter(Boolean);
+
+  function toggle(c: string) {
+    setSelected((s) => (s.includes(c) ? s.filter((x) => x !== c) : [...s, c]));
+  }
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_spy_room", {
+        p_rounds: rounds,
+        p_spies: spies,
+        p_hint_rounds: hintRounds,
+        p_hint_seconds: hintSeconds,
+        p_vote_seconds: voteSeconds,
+        p_categories: !useCustom && selected.length ? selected : null,
+        p_custom: useCustom ? customWords : null,
+      });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        🕵️ الجميع يعرف الكلمة السرية إلا الجاسوس (والكل يعرف المجال). بالدور يلمّح كل لاعب للكلمة كتابةً أو في الصوت، ثم
+        يصوّت الجميع على الجاسوس. إن كُشف يحاول تخمين الكلمة لينجو. من 3 لاعبين.
+        <br />
+        الجاسوس الناجي +30، الجاسوس المكشوف الذي خمّن +20، ومن صوّت على الجاسوس +10.
+      </p>
+
+      <Field label="الكلمات">
+        <div className="mb-2 flex flex-wrap gap-2">
+          <Chip active={!useCustom} onClick={() => setUseCustom(false)}>
+            📚 من المجالات
+          </Chip>
+          <Chip active={useCustom} onClick={() => setUseCustom(true)}>
+            ✍️ كلماتي الخاصة
+          </Chip>
+        </div>
+        {useCustom ? (
+          <>
+            <textarea
+              value={custom}
+              onChange={(e) => setCustom(e.target.value)}
+              rows={3}
+              placeholder="اكتب الكلمات مفصولة بفاصلة أو كل كلمة في سطر (4 على الأقل)"
+              className="input w-full"
+            />
+            <p className="mt-1 text-xs text-indigo-300">{customWords.length} كلمة</p>
+          </>
+        ) : !categories ? (
+          <p className="text-sm text-indigo-200">جارٍ التحميل...</p>
+        ) : (
+          <div className="flex flex-wrap gap-2">
+            <Chip active={selected.length === 0} onClick={() => setSelected([])}>
+              🌐 الكل
+            </Chip>
+            {categories.map((c) => (
+              <Chip key={c.category} active={selected.includes(c.category)} onClick={() => toggle(c.category)}>
+                {c.category}
+              </Chip>
+            ))}
+          </div>
+        )}
+      </Field>
+
+      <Field label="عدد الجواسيس">
+        <div className="flex flex-wrap gap-2">
+          <Chip active={spies === 1} onClick={() => setSpies(1)}>
+            🕵️ جاسوس واحد
+          </Chip>
+          <Chip active={spies === 2} onClick={() => setSpies(2)}>
+            🕵️🕵️ جاسوسان (من 6 لاعبين)
+          </Chip>
+        </div>
+      </Field>
+
+      <div className="grid grid-cols-2 gap-4">
+        <NumberField label="عدد الجولات" value={rounds} onChange={setRounds} min={1} max={10} />
+        <NumberField label="دورات التلميح" value={hintRounds} onChange={setHintRounds} min={1} max={3} />
+        <NumberField label="ثواني كل تلميح" value={hintSeconds} onChange={setHintSeconds} min={15} max={90} />
+        <NumberField label="ثواني التصويت" value={voteSeconds} onChange={setVoteSeconds} min={20} max={120} />
+      </div>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy || (useCustom && customWords.length < 4)} className="btn-primary w-full">
         {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
       </button>
     </form>
