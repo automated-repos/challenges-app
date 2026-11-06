@@ -75,8 +75,11 @@ export interface LudoSide {
 }
 
 export interface LudoEvent {
-  /** six = رمى 6 وهو في البيت (السؤال يخرجه)، overshoot = الرمية أكبر من الباقي */
-  type: "need6" | "six" | "roll" | "overshoot" | "correct" | "wrong" | "timeout";
+  /**
+   * need6 = أول رمية من البيت وليست 6، six = رمى 6 وهو في البيت،
+   * enter = رمية الخروج الثانية (أي رقم يكفي)، overshoot = الرمية أكبر من الباقي
+   */
+  type: "need6" | "six" | "enter" | "roll" | "overshoot" | "correct" | "wrong" | "timeout";
   side: number;
   by: string | null;
   dice: number;
@@ -108,6 +111,8 @@ export interface LudoState {
   seq: number;
   last: LudoEvent | null;
   log: LudoEvent[];
+  /** محاولات الخروج الفاشلة لكل لون (المفتاح رقم اللون). بعد أول محاولة أي رقم يخرجه */
+  home_tries?: Record<string, number>;
 }
 
 export type ChessColor = "w" | "b";

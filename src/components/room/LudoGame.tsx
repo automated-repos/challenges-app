@@ -449,7 +449,9 @@ function eventText(l: LudoState, players: Player[]): string {
     return (
       before +
       (pos < 0
-        ? "ارمِ الزهر! محتاج 6 عشان تطلع من البيت."
+        ? (l.home_tries?.[String(l.turn)] ?? 0) > 0
+          ? "ارمِ الزهر! أي رقم يطلّعك من البيت المرة دي."
+          : "ارمِ الزهر! لو جبت 6 تطلع من البيت، ولو لا الرمية الجاية بأي رقم تطلّعك."
         : left <= 6
           ? `محتاج ${left} بالظبط عشان توصل للنهاية.`
           : "ارمِ الزهر ثم جاوب صح عشان تتقدم.")
@@ -459,6 +461,8 @@ function eventText(l: LudoState, players: Player[]): string {
   if (l.phase === "answer" || l.phase === "pick")
     return e.type === "six"
       ? `🎉 ${who(e)} رمى 6! جاوب صح عشان تطلع من البيت.`
+      : e.type === "enter"
+        ? `${who(e)} رمى ${e.dice} وجه دوره يطلع من البيت. جاوب صح عشان تطلع!`
       : `${who(e)} رمى ${e.dice}. جاوب صح عشان تتقدم ${e.dice} خطوات.`;
   return describe(e, who(e));
 }
@@ -466,9 +470,11 @@ function eventText(l: LudoState, players: Player[]): string {
 function describe(e: LudoEvent, who: string): string {
   switch (e.type) {
     case "need6":
-      return `${who} رمى ${e.dice} (محتاج 6)`;
+      return `${who} رمى ${e.dice} (مش 6) • الرمية الجاية بأي رقم تطلّعه`;
     case "six":
       return `${who} رمى 6 🎉`;
+    case "enter":
+      return `${who} رمى ${e.dice} وجه دوره يطلع من البيت`;
     case "overshoot":
       return `${who} رمى ${e.dice} ومحتاج ${e.need} بالظبط للوصول`;
     case "roll":
