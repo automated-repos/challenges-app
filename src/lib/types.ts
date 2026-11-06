@@ -76,6 +76,8 @@ export interface Room {
   stop_categories: string[] | null;
   stop_letter: string | null;
   updated_at: string;
+  /** لعبة جديدة لنفس اللاعبين: رمز الغرفة التي انتقل إليها الجميع (انظر 0030_rematch.sql) */
+  next_code?: string | null;
 }
 
 /** لون في لودو: فريق (team) أو لاعب (user)، و color رقم اللون في teamInfo */

@@ -95,9 +95,25 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
         ))}
       </ol>
 
+      {room.host_id === userId ? (
+        <Link
+          href={`/?from=${room.code}`}
+          className="block rounded-2xl border border-emerald-400/50 bg-emerald-500/20 px-4 py-4 text-center text-lg font-black transition hover:bg-emerald-500/30"
+        >
+          🎮 لعبة جديدة لنفس اللاعبين
+          <span className="block text-sm font-normal text-emerald-100">
+            اختر أي لعبة، والكل ينتقل تلقائياً بدون رمز جديد
+          </span>
+        </Link>
+      ) : (
+        <p className="rounded-2xl bg-white/5 px-4 py-3 text-center text-sm text-indigo-200">
+          ⏳ لو بدأ منشئ الغرفة لعبة جديدة، هتنتقل لها تلقائياً
+        </p>
+      )}
+
       <div className="flex flex-wrap justify-center gap-3">
-        <Link href="/" className="btn-primary inline-block">
-          مسابقة جديدة
+        <Link href="/" className="btn-ghost inline-flex items-center px-5">
+          الرئيسية
         </Link>
         <Link href="/history" className="btn-ghost inline-flex items-center px-5">
           🏆 لوحة الشرف

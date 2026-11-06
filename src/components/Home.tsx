@@ -19,7 +19,9 @@ export function Home() {
 }
 
 function HomeInner() {
-  const [tab, setTab] = useState<"join" | "create">("join");
+  // ?from=رمز: لعبة جديدة لنفس لاعبي غرفة سابقة (ينتقلون تلقائياً)
+  const [fromCode] = useState(() => parseRoomCode(new URLSearchParams(window.location.search).get("from") ?? ""));
+  const [tab, setTab] = useState<"join" | "create">(fromCode.length === 6 ? "create" : "join");
   const auth = useAuth();
 
   if (auth.loading) return <Center>جارٍ التحميل...</Center>;
@@ -64,6 +66,15 @@ function HomeInner() {
           </div>
 
           <section className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
+            {tab === "create" && fromCode.length === 6 && (
+              <p className="mb-4 rounded-2xl border border-emerald-400/40 bg-emerald-500/15 p-3 text-sm text-emerald-100">
+                🎮 لعبة جديدة لنفس لاعبي الغرفة{" "}
+                <b dir="ltr" className="font-mono">
+                  {fromCode}
+                </b>
+                : اختر اللعبة وإعداداتها، وكل اللاعبين سينتقلون للغرفة الجديدة تلقائياً بدون رمز.
+              </p>
+            )}
             {tab === "join" ? <JoinForm /> : <CreateTab />}
           </section>
         </div>
@@ -113,6 +124,26 @@ function JoinForm() {
       </button>
     </form>
   );
+}
+
+/**
+ * بعد إنشاء غرفة: إن جئنا من غرفة سابقة (?from=رمز) يُنقل لاعبوها للغرفة الجديدة،
+ * ثم ننتقل نحن للغرفة الجديدة.
+ */
+function useAfterCreate() {
+  const router = useRouter();
+  return async (code: string) => {
+    const from = parseRoomCode(new URLSearchParams(window.location.search).get("from") ?? "");
+    if (from.length === 6) {
+      const sb = getSupabase();
+      const { data: old } = await sb.from("rooms").select("id").eq("code", from).maybeSingle();
+      if (old) {
+        const { error } = await sb.rpc("move_to_room", { p_old: old.id, p_new_code: code });
+        if (error) throw error;
+      }
+    }
+    router.push(`/room/?code=${code}`);
+  };
 }
 
 /** اختيار نوع اللعبة ثم إعداداتها */
@@ -178,7 +209,7 @@ function CreateTab() {
 }
 
 function LudoForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -209,7 +240,7 @@ function LudoForm() {
         p_turn_pick: turnPick,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -266,7 +297,7 @@ function LudoForm() {
 }
 
 function DominoForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -293,7 +324,7 @@ function DominoForm() {
         p_difficulty: difficulty,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -327,7 +358,7 @@ function DominoForm() {
 }
 
 function SnakesForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -358,7 +389,7 @@ function SnakesForm() {
         p_turn_pick: turnPick,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -420,7 +451,7 @@ function SnakesForm() {
 }
 
 function Connect4Form() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -449,7 +480,7 @@ function Connect4Form() {
         p_difficulty: difficulty,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -501,7 +532,7 @@ function Connect4Form() {
 }
 
 function BankForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -528,7 +559,7 @@ function BankForm() {
         p_difficulty: difficulty,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -577,7 +608,7 @@ function BankForm() {
 }
 
 function SpyForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<{ category: string; words: number }[] | null>(null);
   const [selected, setSelected] = useState<string[]>([]); // فارغة = الكل
   const [useCustom, setUseCustom] = useState(false);
@@ -617,7 +648,7 @@ function SpyForm() {
         p_custom: useCustom ? customWords : null,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -693,7 +724,7 @@ function SpyForm() {
 }
 
 function PirateForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -722,7 +753,7 @@ function PirateForm() {
         p_difficulty: difficulty,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -765,7 +796,7 @@ function PirateForm() {
 }
 
 function ChessForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
@@ -792,7 +823,7 @@ function ChessForm() {
         p_difficulty: difficulty,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -844,7 +875,7 @@ const STOP_PRESETS = [
 const STOP_DEFAULT = ["اسم ولد", "اسم بنت", "حيوان", "نبات", "جماد", "بلد"];
 
 function StopForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [cats, setCats] = useState<string[]>(STOP_DEFAULT);
   const [custom, setCustom] = useState("");
   const [rounds, setRounds] = useState(5);
@@ -873,7 +904,7 @@ function StopForm() {
         p_seconds: seconds,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (err) {
       setError(errorMessage(err));
       setBusy(false);
@@ -931,7 +962,7 @@ function StopForm() {
 }
 
 function CreateForm() {
-  const router = useRouter();
+  const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
   const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
   const [total, setTotal] = useState(10);
@@ -973,7 +1004,7 @@ function CreateForm() {
         p_turn_pick: turnPick,
       });
       if (error) throw error;
-      router.push(`/room/?code=${data}`);
+      await afterCreate(data as string);
     } catch (e) {
       setError(errorMessage(e));
       setBusy(false);

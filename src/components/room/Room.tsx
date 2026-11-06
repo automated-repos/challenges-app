@@ -1,8 +1,8 @@
 "use client";
 
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { errorMessage, isConfigured } from "@/lib/supabase";
 import { parseRoomCode } from "@/lib/roomCode";
 import type { Player, Profile, Room } from "@/lib/types";
@@ -66,6 +66,24 @@ function AuthGate({ code }: { code: string }) {
 
 function RoomInner({ code, userId, profile }: { code: string; userId: string; profile: Profile }) {
   const { phase, error, room, players, offset, join, call } = useRoom(code, userId);
+  const router = useRouter();
+  const nextCode = room?.next_code ?? null;
+
+  // منشئ الغرفة بدأ لعبة جديدة لنفس اللاعبين: ننتقل لها تلقائياً
+  useEffect(() => {
+    if (!nextCode) return;
+    const t = setTimeout(() => router.replace(`/room/?code=${nextCode}`), 1500);
+    return () => clearTimeout(t);
+  }, [nextCode, router]);
+
+  if (nextCode)
+    return (
+      <Center>
+        <div className="text-5xl">🎮</div>
+        <p className="mt-3 text-lg font-bold text-white">منشئ الغرفة بدأ لعبة جديدة!</p>
+        <p className="mt-1">جارٍ نقلك للغرفة الجديدة...</p>
+      </Center>
+    );
 
   if (phase === "loading") return <Center>جارٍ التحميل...</Center>;
   if (phase === "error")

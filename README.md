@@ -37,8 +37,9 @@
 27. [`supabase/migrations/0027_snakes_ladders.sql`](supabase/migrations/0027_snakes_ladders.sql): سلم وثعبان الأسئلة
 28. [`supabase/migrations/0028_connect4.sql`](supabase/migrations/0028_connect4.sql): أربعة على التوالي
 29. [`supabase/migrations/0029_domino.sql`](supabase/migrations/0029_domino.sql): دومينو الأسئلة
-30. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
-31. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
+30. [`supabase/migrations/0030_rematch.sql`](supabase/migrations/0030_rematch.sql): لعبة جديدة لنفس اللاعبين بدون رمز جديد
+31. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+32. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
@@ -158,6 +159,9 @@ supabase functions deploy chess-move --no-verify-jwt
 - **بالأسئلة:** قبل كل قطعة سؤال؛ صح = تضع قطعتك، خطأ = يضيع الدور. **كلاسيكي:** بدون أسئلة.
 - امتلاء اللوحة = تعادل. النقاط: الفوز +30 لكل أعضاء الطرف، والتعادل +10، والأسئلة حسب الإعدادات.
 - لكل قطعة 30 ثانية، وبعدها تسقط في عمود عشوائي.
+
+## لعبة جديدة لنفس اللاعبين 🎮
+بعد انتهاء أي لعبة (أو من غرفة الانتظار) يضغط منشئ الغرفة **🎮 لعبة جديدة لنفس اللاعبين**، فيختار أي لعبة وإعداداتها، وكل اللاعبين ينتقلون للغرفة الجديدة تلقائياً بدون رمز جديد. هناك يمكن تغيير الفرق وغيرها كالعادة.
 
 ## التثبيت على الهاتف
 الموقع قابل للتثبيت كتطبيق: على أندرويد يظهر زر **📲 ثبّت التطبيق** في الصفحة الرئيسية (أو من قائمة Chrome ← تثبيت التطبيق). على آيفون: Safari ← زر المشاركة ← **إضافة إلى الشاشة الرئيسية**.

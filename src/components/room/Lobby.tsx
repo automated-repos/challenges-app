@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
 import { errorMessage } from "@/lib/supabase";
 import { copyText, roomLink } from "@/lib/roomCode";
@@ -147,6 +148,11 @@ export function Lobby({
           </button>
         </div>
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
+        {isHost && (
+          <Link href={`/?from=${room.code}`} className="btn-ghost mt-1 inline-block">
+            🎮 تغيير اللعبة (والكل ينتقل معك)
+          </Link>
+        )}
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
           {room.game === "domino" ? (
             <>
