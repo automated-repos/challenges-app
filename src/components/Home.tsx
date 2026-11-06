@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { errorMessage, getSupabase, isConfigured } from "@/lib/supabase";
 import { parseRoomCode } from "@/lib/roomCode";
 import { DIFFICULTIES, type Category, type Difficulty } from "@/lib/types";
@@ -20,8 +20,10 @@ export function Home() {
 
 function HomeInner() {
   // ?from=رمز: لعبة جديدة لنفس لاعبي غرفة سابقة (ينتقلون تلقائياً)
-  const [fromCode] = useState(() => parseRoomCode(new URLSearchParams(window.location.search).get("from") ?? ""));
-  const [tab, setTab] = useState<"join" | "create">(fromCode.length === 6 ? "create" : "join");
+  // يُقرأ من useSearchParams (لا من window.location) لأن العنوان يتغير بعد عرض الصفحة عند التنقل داخل التطبيق
+  const fromCode = parseRoomCode(useSearchParams().get("from") ?? "");
+  const [chosenTab, setTab] = useState<"join" | "create" | null>(null);
+  const tab = chosenTab ?? (fromCode.length === 6 ? "create" : "join");
   const auth = useAuth();
 
   if (auth.loading) return <Center>جارٍ التحميل...</Center>;
@@ -132,8 +134,8 @@ function JoinForm() {
  */
 function useAfterCreate() {
   const router = useRouter();
+  const from = parseRoomCode(useSearchParams().get("from") ?? "");
   return async (code: string) => {
-    const from = parseRoomCode(new URLSearchParams(window.location.search).get("from") ?? "");
     if (from.length === 6) {
       const sb = getSupabase();
       const { data: old } = await sb.from("rooms").select("id").eq("code", from).maybeSingle();
@@ -211,7 +213,7 @@ function CreateTab() {
 function LudoForm() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [turnPick, setTurnPick] = useState<"random" | "choose">("random");
   const [steps, setSteps] = useState(20);
@@ -268,8 +270,6 @@ function LudoForm() {
         />
       </Field>
 
-      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
-
       <Field label="السؤال">
         <div className="flex flex-wrap gap-2">
           <Chip active={turnPick === "random"} onClick={() => setTurnPick("random")}>
@@ -299,7 +299,7 @@ function LudoForm() {
 function DominoForm() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [seconds, setSeconds] = useState(20);
   const [pointsCorrect, setPointsCorrect] = useState(10);
@@ -341,7 +341,6 @@ function DominoForm() {
         مكافأة الترتيب: الأول +30، الثاني +20، الثالث +10.
       </p>
 
-      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
       <DifficultyField value={difficulty} onChange={setDifficulty} />
 
       <div className="grid grid-cols-2 gap-4">
@@ -360,7 +359,7 @@ function DominoForm() {
 function SnakesForm() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [turnPick, setTurnPick] = useState<"random" | "choose">("random");
   const [size, setSize] = useState(50);
@@ -422,8 +421,6 @@ function SnakesForm() {
         </div>
       </Field>
 
-      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
-
       <Field label="السؤال">
         <div className="flex flex-wrap gap-2">
           <Chip active={turnPick === "random"} onClick={() => setTurnPick("random")}>
@@ -453,7 +450,7 @@ function SnakesForm() {
 function Connect4Form() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [mode, setMode] = useState<"quiz" | "classic">("quiz");
   const [seconds, setSeconds] = useState(20);
@@ -507,7 +504,6 @@ function Connect4Form() {
 
       {mode === "quiz" && (
         <>
-          <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
           <DifficultyField value={difficulty} onChange={setDifficulty} />
           <div className="grid grid-cols-2 gap-4">
             <NumberField label="ثواني كل سؤال" value={seconds} onChange={setSeconds} min={10} max={60} />
@@ -534,7 +530,7 @@ function Connect4Form() {
 function BankForm() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [rounds, setRounds] = useState(15);
   const [startCash, setStartCash] = useState(1500);
@@ -595,7 +591,6 @@ function BankForm() {
         </div>
       </Field>
 
-      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
       <DifficultyField value={difficulty} onChange={setDifficulty} />
       <NumberField label="ثواني كل سؤال" value={seconds} onChange={setSeconds} min={10} max={60} />
 
@@ -726,7 +721,7 @@ function SpyForm() {
 function PirateForm() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [islands, setIslands] = useState(10);
   const [seconds, setSeconds] = useState(20);
@@ -779,7 +774,6 @@ function PirateForm() {
         />
       </Field>
 
-      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
       <DifficultyField value={difficulty} onChange={setDifficulty} />
 
       <div className="grid grid-cols-2 gap-4">
@@ -798,7 +792,7 @@ function PirateForm() {
 function ChessForm() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
   const [seconds, setSeconds] = useState(20);
   const [pointsCorrect, setPointsCorrect] = useState(10);
@@ -840,7 +834,6 @@ function ChessForm() {
         الفوز بكش مات: +30 لكل أعضاء الطرف الفائز، والتعادل +10 للجميع.
       </p>
 
-      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
       <DifficultyField value={difficulty} onChange={setDifficulty} />
 
       <div className="grid grid-cols-2 gap-4">
@@ -964,7 +957,7 @@ function StopForm() {
 function CreateForm() {
   const afterCreate = useAfterCreate();
   const [categories, setCategories] = useState<Category[] | null>(null);
-  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [total, setTotal] = useState(10);
   const [questionSeconds, setQuestionSeconds] = useState(20);
   const [answerSeconds, setAnswerSeconds] = useState(10);
@@ -1013,8 +1006,6 @@ function CreateForm() {
 
   return (
     <form onSubmit={submit} className="space-y-5">
-      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
-
       <Field label="طريقة اللعب">
         <div className="flex flex-wrap gap-2">
           <Chip active={playMode === "buzzer"} onClick={() => setPlayMode("buzzer")}>
@@ -1076,8 +1067,8 @@ function CreateForm() {
       {categories && total > available && (
         <p className="text-sm text-amber-300">
           {available === 0
-            ? "لا توجد أسئلة بهذا المستوى في المجالات المختارة."
-            : `يوجد ${available} سؤالاً فقط ${difficulty ? "بهذا المستوى " : ""}في المجالات المختارة، وسيُستخدم هذا العدد.`}
+            ? "لا توجد أسئلة بهذا المستوى."
+            : `يوجد ${available} سؤالاً فقط ${difficulty ? "بهذا المستوى" : ""}، وسيُستخدم هذا العدد.`}
         </p>
       )}
       {error && <ErrorBox>{error}</ErrorBox>}
@@ -1092,40 +1083,6 @@ async function loadCategories(): Promise<Category[]> {
   const { data, error } = await getSupabase().rpc("list_categories");
   if (error) throw error;
   return data as Category[];
-}
-
-/** اختيار المجالات (فارغة = الكل) مع عدد الأسئلة بالمستوى المختار */
-function CategoryField({
-  categories,
-  selected,
-  onChange,
-  difficulty,
-}: {
-  categories: Category[] | null;
-  selected: number[];
-  onChange: (ids: number[]) => void;
-  difficulty: Difficulty | null;
-}) {
-  const toggle = (id: number) => onChange(selected.includes(id) ? selected.filter((x) => x !== id) : [...selected, id]);
-  return (
-    <Field label="المجالات">
-      {!categories ? (
-        <p className="text-sm text-indigo-200">جارٍ التحميل...</p>
-      ) : (
-        <div className="flex flex-wrap gap-2">
-          <Chip active={selected.length === 0} onClick={() => onChange([])}>
-            🌐 الكل
-          </Chip>
-          {categories.map((c) => (
-            <Chip key={c.id} active={selected.includes(c.id)} onClick={() => toggle(c.id)}>
-              {c.icon} {c.name}
-              <span className="opacity-60"> ({difficulty ? c[`${difficulty}_count`] : c.question_count})</span>
-            </Chip>
-          ))}
-        </div>
-      )}
-    </Field>
-  );
 }
 
 function DifficultyField({ value, onChange }: { value: Difficulty | null; onChange: (d: Difficulty | null) => void }) {
