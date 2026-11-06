@@ -117,18 +117,24 @@ function JoinForm() {
 
 /** اختيار نوع اللعبة ثم إعداداتها */
 function CreateTab() {
-  const [game, setGame] = useState<"quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy">("quiz");
+  const [game, setGame] = useState<
+    "quiz" | "stop" | "ludo" | "snakes" | "chess" | "pirate" | "spy" | "bank" | "connect4" | "domino"
+  >("quiz");
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
+      <div className="grid grid-cols-3 gap-2 sm:grid-cols-4">
         {(
           [
             { id: "quiz", icon: "🧠", name: "مسابقة أسئلة" },
             { id: "stop", icon: "🚌", name: "أتوبيس كومبليت" },
             { id: "ludo", icon: "🎲", name: "لودو" },
+            { id: "snakes", icon: "🐍", name: "سلم وثعبان" },
             { id: "chess", icon: "♟️", name: "شطرنج" },
             { id: "pirate", icon: "🏴‍☠️", name: "قرصان المعرفة" },
             { id: "spy", icon: "🕵️", name: "الجاسوس" },
+            { id: "bank", icon: "🏙️", name: "إمبراطورية المدن" },
+            { id: "connect4", icon: "🔴", name: "أربعة على التوالي" },
+            { id: "domino", icon: "🁫", name: "دومينو" },
           ] as const
         ).map((g) => (
           <button
@@ -152,12 +158,20 @@ function CreateTab() {
         <StopForm />
       ) : game === "ludo" ? (
         <LudoForm />
+      ) : game === "snakes" ? (
+        <SnakesForm />
+      ) : game === "domino" ? (
+        <DominoForm />
       ) : game === "chess" ? (
         <ChessForm />
       ) : game === "pirate" ? (
         <PirateForm />
-      ) : (
+      ) : game === "spy" ? (
         <SpyForm />
+      ) : game === "bank" ? (
+        <BankForm />
+      ) : (
+        <Connect4Form />
       )}
     </div>
   );
@@ -243,6 +257,317 @@ function LudoForm() {
         <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={100} />
         <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
       </div>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy || !categories} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
+function DominoForm() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [seconds, setSeconds] = useState(20);
+  const [pointsCorrect, setPointsCorrect] = useState(10);
+  const [pointsWrong, setPointsWrong] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_domino_room", {
+        p_seconds: seconds,
+        p_points_correct: pointsCorrect,
+        p_points_wrong: pointsWrong,
+        p_category_ids: selected.length ? selected : null,
+        p_difficulty: difficulty,
+      });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        دومينو الأسئلة: من 2 إلى 4 لاعبين، لكل لاعب 7 قطع لا يراها غيره. كل دور يبدأ بسؤال: الإجابة الصحيحة تعطيك نقاطاً
+        وتلعب قطعة تطابق أحد طرفي السلسلة (وإن لم تجد تسحب من البنك)، والخاطئة تخصم نقاطاً وتسحب قطعة عقاباً. أول من
+        يُنهي قطعه يفوز، وإن قُفلت اللعبة يفوز صاحب أقل نقط في يده.
+        <br />
+        مكافأة الترتيب: الأول +30، الثاني +20، الثالث +10.
+      </p>
+
+      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
+      <DifficultyField value={difficulty} onChange={setDifficulty} />
+
+      <div className="grid grid-cols-2 gap-4">
+        <NumberField label="ثواني الإجابة" value={seconds} onChange={setSeconds} min={10} max={60} />
+        <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={100} />
+        <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
+      </div>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy || !categories} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
+function SnakesForm() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [turnPick, setTurnPick] = useState<"random" | "choose">("random");
+  const [size, setSize] = useState(50);
+  const [seconds, setSeconds] = useState(20);
+  const [pointsCorrect, setPointsCorrect] = useState(10);
+  const [pointsWrong, setPointsWrong] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_snakes_room", {
+        p_size: size,
+        p_seconds: seconds,
+        p_points_correct: pointsCorrect,
+        p_points_wrong: pointsWrong,
+        p_category_ids: selected.length ? selected : null,
+        p_difficulty: difficulty,
+        p_turn_pick: turnPick,
+      });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        سلم وثعبان الأسئلة: فردي أو فرق (حتى 6 ألوان)، والكل يبدأ من أول اللوحة. بعد كل رمية سؤال: الإجابة الصحيحة
+        تحرّكك بعدد الزهر، والخاطئة تمنع الحركة وتخصم نقاطاً. لو وقفت أسفل سلم 🪜 تطلع لأعلاه، ولو وقفت على رأس ثعبان 🐍
+        تنزل لذيله. الوصول للمربع الأخير بالرقم بالضبط.
+        <br />
+        مكافأة الوصول: الأول +30، الثاني +20، الثالث +10.
+      </p>
+
+      <Field label="حجم اللوحة">
+        <div className="flex flex-wrap gap-2">
+          {(
+            [
+              [30, "قصيرة • 30 مربع"],
+              [50, "متوسطة • 50 مربع"],
+              [100, "كلاسيك • 100 مربع"],
+            ] as const
+          ).map(([n, label]) => (
+            <Chip key={n} active={size === n} onClick={() => setSize(n)}>
+              {label}
+            </Chip>
+          ))}
+        </div>
+      </Field>
+
+      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
+
+      <Field label="السؤال">
+        <div className="flex flex-wrap gap-2">
+          <Chip active={turnPick === "random"} onClick={() => setTurnPick("random")}>
+            🎲 سؤال عشوائي
+          </Chip>
+          <Chip active={turnPick === "choose"} onClick={() => setTurnPick("choose")}>
+            🗂️ صاحب الدور يختار المجال
+          </Chip>
+        </div>
+      </Field>
+
+      <DifficultyField value={difficulty} onChange={setDifficulty} />
+
+      <div className="grid grid-cols-2 gap-4">
+        <NumberField label="ثواني الإجابة" value={seconds} onChange={setSeconds} min={10} max={60} />
+        <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={100} />
+        <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
+      </div>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy || !categories} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
+function Connect4Form() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [mode, setMode] = useState<"quiz" | "classic">("quiz");
+  const [seconds, setSeconds] = useState(20);
+  const [pointsCorrect, setPointsCorrect] = useState(10);
+  const [pointsWrong, setPointsWrong] = useState(5);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_connect4_room", {
+        p_mode: mode,
+        p_seconds: seconds,
+        p_points_correct: pointsCorrect,
+        p_points_wrong: pointsWrong,
+        p_category_ids: selected.length ? selected : null,
+        p_difficulty: difficulty,
+      });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        🔴🟡 لاعبان أو فريقان. بالدور تُسقط قطعتك في عمود فتنزل لأسفله، وأول من يصف 4 قطع متتالية (أفقياً أو رأسياً أو
+        قطرياً) يفوز (+30 لكل أعضاء الطرف، والتعادل +10).
+      </p>
+
+      <Field label="النمط">
+        <div className="flex flex-wrap gap-2">
+          <Chip active={mode === "quiz"} onClick={() => setMode("quiz")}>
+            ❓ بالأسئلة: صح = تضع قطعتك
+          </Chip>
+          <Chip active={mode === "classic"} onClick={() => setMode("classic")}>
+            🎯 كلاسيكي بدون أسئلة
+          </Chip>
+        </div>
+      </Field>
+
+      {mode === "quiz" && (
+        <>
+          <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
+          <DifficultyField value={difficulty} onChange={setDifficulty} />
+          <div className="grid grid-cols-2 gap-4">
+            <NumberField label="ثواني كل سؤال" value={seconds} onChange={setSeconds} min={10} max={60} />
+            <NumberField
+              label="نقاط الإجابة الصحيحة"
+              value={pointsCorrect}
+              onChange={setPointsCorrect}
+              min={0}
+              max={100}
+            />
+            <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
+          </div>
+        </>
+      )}
+
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy || (mode === "quiz" && !categories)} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
+function BankForm() {
+  const router = useRouter();
+  const [categories, setCategories] = useState<Category[] | null>(null);
+  const [selected, setSelected] = useState<number[]>([]); // فارغة = الكل
+  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [rounds, setRounds] = useState(15);
+  const [startCash, setStartCash] = useState(1500);
+  const [seconds, setSeconds] = useState(20);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
+  }, []);
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_bank_room", {
+        p_rounds: rounds,
+        p_start_cash: startCash,
+        p_seconds: seconds,
+        p_category_ids: selected.length ? selected : null,
+        p_difficulty: difficulty,
+      });
+      if (error) throw error;
+      router.push(`/room/?code=${data}`);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        🏙️ من 2 إلى 6 لاعبين. ارمِ الزهرين وتنقّل بين 16 مدينة عربية: اشترِ المدن، رقِّها، واجمع الإيجارات. أجب على
+        الأسئلة لتشتري بنصف السعر أو تدفع نصف الإيجار (والخطأ يضاعفه)، ومربعات ⭐ تعطيك +150 أو تأخذ 50. امتلاك
+        المدينتين من نفس اللون يضاعف إيجارهما. بعد الجولات يفوز الأغنى.
+      </p>
+
+      <Field label={`عدد الجولات: ${rounds}`}>
+        <input
+          type="range"
+          min={5}
+          max={40}
+          value={rounds}
+          onChange={(e) => setRounds(Number(e.target.value))}
+          className="w-full accent-amber-400"
+        />
+      </Field>
+
+      <Field label="رصيد البداية">
+        <div className="flex flex-wrap gap-2">
+          {[1000, 1500, 2000, 3000].map((v) => (
+            <Chip key={v} active={startCash === v} onClick={() => setStartCash(v)}>
+              💵 {v}
+            </Chip>
+          ))}
+        </div>
+      </Field>
+
+      <CategoryField categories={categories} selected={selected} onChange={setSelected} difficulty={difficulty} />
+      <DifficultyField value={difficulty} onChange={setDifficulty} />
+      <NumberField label="ثواني كل سؤال" value={seconds} onChange={setSeconds} min={10} max={60} />
+
       {error && <ErrorBox>{error}</ErrorBox>}
       <button disabled={busy || !categories} className="btn-primary w-full">
         {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}

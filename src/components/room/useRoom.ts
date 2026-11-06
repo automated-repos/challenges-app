@@ -148,6 +148,21 @@ function newer(prev: Room | null, next: Room): Room {
 }
 
 export function currentDeadline(room: Room): number | null {
+  if (room.game === "domino") {
+    if (room.status !== "playing" || !room.question_deadline) return null;
+    // ثانية سماح للإجابة (نفس القاعدة)
+    return Date.parse(room.question_deadline) + (room.domino?.phase === "question" ? 1000 : 0);
+  }
+  if (room.game === "connect4") {
+    if (room.status !== "playing" || !room.question_deadline) return null;
+    // ثانية سماح للإجابة (نفس القاعدة)
+    return Date.parse(room.question_deadline) + (room.c4?.phase === "question" ? 1000 : 0);
+  }
+  if (room.game === "bank") {
+    if (room.status !== "playing" || !room.question_deadline) return null;
+    // ثانية سماح للإجابة (نفس القاعدة)
+    return Date.parse(room.question_deadline) + (room.bank?.phase === "question" ? 1000 : 0);
+  }
   if (room.game === "spy") {
     // لا وقت في الجاسوس: صاحب الغرفة ينقل المراحل
     return null;
@@ -163,6 +178,11 @@ export function currentDeadline(room: Room): number | null {
     if (room.status !== "playing" || !room.question_deadline || (phase !== "question" && phase !== "reveal"))
       return null;
     return Date.parse(room.question_deadline) + (phase === "question" ? 1000 : 0);
+  }
+  if (room.game === "snakes") {
+    if (room.status !== "playing" || !room.question_deadline) return null;
+    // ثانية سماح للإجابة (نفس القاعدة)
+    return Date.parse(room.question_deadline) + (room.snakes?.phase === "answer" ? 1000 : 0);
   }
   if (room.game === "ludo") {
     if (room.status !== "playing" || !room.question_deadline) return null;

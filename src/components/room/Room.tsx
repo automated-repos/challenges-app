@@ -16,9 +16,13 @@ import { QuestionView } from "./QuestionView";
 import { PickCategory } from "./PickCategory";
 import { StopGame } from "./StopGame";
 import { LudoGame } from "./LudoGame";
+import { SnakesGame } from "./SnakesGame";
+import { DominoGame } from "./DominoGame";
 import { ChessGame } from "./ChessGame";
 import { PirateGame } from "./PirateGame";
 import { SpyGame } from "./SpyGame";
+import { BankGame } from "./BankGame";
+import { Connect4Game } from "./Connect4Game";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 import { VoiceChat } from "./VoiceChat";
@@ -98,6 +102,35 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
 
       {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
 
+      {room.status === "playing" && room.game === "domino" && room.domino && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <DominoGame
+            room={room}
+            state={room.domino}
+            players={players}
+            userId={userId}
+            isHost={isHost}
+            offset={offset}
+            call={call}
+          />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
+        </div>
+      )}
+
+      {room.status === "playing" && room.game === "connect4" && room.c4 && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <Connect4Game room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
+        </div>
+      )}
+
+      {room.status === "playing" && room.game === "bank" && room.bank && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <BankGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
+        </div>
+      )}
+
       {room.status === "playing" && room.game === "spy" && room.spy && (
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
           <SpyGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
@@ -115,6 +148,21 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
       {room.status === "playing" && room.game === "chess" && room.chess && (
         <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
           <ChessGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+          <Scoreboard players={players} userId={userId} room={room} call={call} />
+        </div>
+      )}
+
+      {room.status === "playing" && room.game === "snakes" && room.snakes && (
+        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+          <SnakesGame
+            room={room}
+            state={room.snakes}
+            players={players}
+            userId={userId}
+            isHost={isHost}
+            offset={offset}
+            call={call}
+          />
           <Scoreboard players={players} userId={userId} room={room} call={call} />
         </div>
       )}

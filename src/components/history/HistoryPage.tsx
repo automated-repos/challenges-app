@@ -35,7 +35,7 @@ interface Match {
   questions: number;
   categories: string[] | null;
   /** نوع اللعبة (قد يغيب في قواعد بيانات قديمة لم يُشغَّل فيها 0012) */
-  game?: "quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy";
+  game?: "quiz" | "stop" | "ludo" | "snakes" | "chess" | "pirate" | "spy" | "bank" | "connect4" | "domino";
   players: MatchPlayer[];
 }
 
@@ -284,17 +284,25 @@ function MatchCard({ match, userId }: { match: Match; userId: string }) {
           </p>
           <p className="text-xs text-indigo-300">
             {match.finished_at ? dateFmt.format(new Date(match.finished_at)) : "—"} • {players.length} لاعبين •{" "}
-            {match.game === "spy"
-              ? "🕵️ الجاسوس"
-              : match.game === "pirate"
-                ? "🏴‍☠️ قرصان المعرفة"
-                : match.game === "chess"
-                  ? "♟️ شطرنج"
-                  : match.game === "ludo"
-                    ? "🎲 لودو"
-                    : match.game === "stop"
-                      ? `🚌 أتوبيس كومبليت • ${match.questions} جولات`
-                      : `${match.questions} أسئلة`}
+            {match.game === "domino"
+              ? "🁫 دومينو"
+              : match.game === "connect4"
+                ? "🔴 أربعة على التوالي"
+                : match.game === "bank"
+                  ? "🏙️ إمبراطورية المدن"
+                  : match.game === "spy"
+                    ? "🕵️ الجاسوس"
+                    : match.game === "pirate"
+                      ? "🏴‍☠️ قرصان المعرفة"
+                      : match.game === "chess"
+                        ? "♟️ شطرنج"
+                        : match.game === "ludo"
+                          ? "🎲 لودو"
+                          : match.game === "snakes"
+                            ? "🐍 سلم وثعبان"
+                            : match.game === "stop"
+                              ? `🚌 أتوبيس كومبليت • ${match.questions} جولات`
+                              : `${match.questions} أسئلة`}
             {me && <> • مركزك: {me.place}</>}
           </p>
         </div>

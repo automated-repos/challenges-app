@@ -102,7 +102,10 @@ export function Lobby({
   // اللعب منفرداً لا يُحتسب، فلا تبدأ المسابقة إلا بلاعبين على الأقل (نفس شرط القاعدة)
   const alone = players.length < 2;
   // لودو الفردي: 6 لاعبين على الأكثر (نفس شرط القاعدة)، وأكثر من ذلك بالفرق
-  const tooMany = (room.game === "ludo" || room.game === "pirate") && !teamMode && players.length > 6;
+  const tooMany =
+    (room.game === "ludo" || room.game === "snakes" || room.game === "pirate" || room.game === "bank") &&
+    !teamMode &&
+    players.length > 6;
   // الشطرنج الفردي للاعبين اثنين بالضبط، وفي الفرق فريقان بالضبط
   const chessBlock =
     room.game !== "chess"
@@ -114,7 +117,19 @@ export function Lobby({
           : "";
   // الجاسوس من 3 لاعبين
   const spyBlock = room.game === "spy" && players.length < 3 ? "الجاسوس تحتاج 3 لاعبين على الأقل" : "";
-  const canStart = !alone && !tooMany && !chessBlock && !spyBlock && allReady && !teamBlock;
+  // أربعة على التوالي: لاعبان أو فريقان بالضبط
+  const c4Block =
+    room.game !== "connect4"
+      ? ""
+      : !teamMode && players.length > 2
+        ? `أربعة على التوالي للاعبين اثنين فقط، وفي الغرفة ${players.length}. اختر "فريقان".`
+        : teamMode && teamCount !== 2 && !teamBlock
+          ? "أربعة على التوالي بين فريقين بالضبط"
+          : "";
+  // الدومينو من 2 إلى 4 لاعبين (نفس شرط القاعدة)
+  const dominoBlock =
+    room.game === "domino" && players.length > 4 ? `الدومينو حتى 4 لاعبين، وفي الغرفة ${players.length}` : "";
+  const canStart = !alone && !tooMany && !chessBlock && !c4Block && !spyBlock && !dominoBlock && allReady && !teamBlock;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -133,7 +148,35 @@ export function Lobby({
         </div>
         <p className="mt-2 h-5 text-sm text-emerald-300">{notice}</p>
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
-          {room.game === "spy" ? (
+          {room.game === "domino" ? (
+            <>
+              <span>🁫 دومينو الأسئلة</span>
+              <span>2 إلى 4 لاعبين • 7 قطع لكل لاعب</span>
+              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+              <span>+{room.points_correct} للصحيحة</span>
+              <span>−{room.points_wrong} للخاطئة</span>
+              <span>{room.question_seconds} ث للإجابة</span>
+            </>
+          ) : room.game === "connect4" ? (
+            <>
+              <span>🔴🟡 أربعة على التوالي</span>
+              <span>{room.c4?.mode === "classic" ? "🎯 كلاسيكي" : "❓ بالأسئلة"}</span>
+              {room.c4?.mode !== "classic" && (
+                <>
+                  <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+                  <span>{room.question_seconds} ث لكل سؤال</span>
+                </>
+              )}
+            </>
+          ) : room.game === "bank" ? (
+            <>
+              <span>🏙️ إمبراطورية المدن</span>
+              <span>{room.bank?.rounds ?? room.total_questions} جولة</span>
+              <span>💵 {room.bank?.start_cash ?? 1500} رصيد البداية</span>
+              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+              <span>{room.question_seconds} ث لكل سؤال</span>
+            </>
+          ) : room.game === "spy" ? (
             <>
               <span>🕵️ الجاسوس</span>
               <span>{room.total_questions} جولات</span>
@@ -161,6 +204,16 @@ export function Lobby({
               <span>+{room.points_correct} للصحيحة</span>
               <span>−{room.points_wrong} للخاطئة</span>
               <span>{room.question_seconds} ث لكل سؤال</span>
+            </>
+          ) : room.game === "snakes" ? (
+            <>
+              <span>🐍 سلم وثعبان الأسئلة</span>
+              <span>لوحة {room.snakes?.steps ?? 50} مربع</span>
+              <span>{room.turn_pick === "choose" ? "🗂️ صاحب الدور يختار المجال" : "🎲 سؤال عشوائي"}</span>
+              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
+              <span>+{room.points_correct} للصحيحة</span>
+              <span>−{room.points_wrong} للخاطئة</span>
+              <span>{room.question_seconds} ث للإجابة</span>
             </>
           ) : room.game === "ludo" ? (
             <>
@@ -207,7 +260,9 @@ export function Lobby({
         </div>
       </section>
 
-      {isHost && room.game !== "stop" && room.game !== "spy" && <TeamSettings room={room} busy={busy} run={run} />}
+      {isHost && room.game !== "stop" && room.game !== "spy" && room.game !== "bank" && room.game !== "domino" && (
+        <TeamSettings room={room} busy={busy} run={run} />
+      )}
 
       {teamMode ? (
         <LobbyTeams room={room} players={players} userId={userId} busy={busy} run={run} />
@@ -258,8 +313,9 @@ export function Lobby({
           </button>
           {tooMany && (
             <p className="text-center text-sm text-amber-200">
-              {room.game === "pirate" ? "🏴‍☠️ قرصان المعرفة" : "🎲 لودو"} الفردي حتى 6 لاعبين، وفي الغرفة {players.length}
-              . العبوا بالفرق.
+              {room.game === "bank"
+                ? `🏙️ إمبراطورية المدن حتى 6 لاعبين، وفي الغرفة ${players.length}.`
+                : `${room.game === "pirate" ? "🏴‍☠️ قرصان المعرفة" : "🎲 لودو"} الفردي حتى 6 لاعبين، وفي الغرفة ${players.length}. العبوا بالفرق.`}
             </p>
           )}
           {alone && (
@@ -274,6 +330,8 @@ export function Lobby({
           )}
           {teamBlock && <p className="text-center text-sm text-amber-200">👥 {teamBlock}</p>}
           {chessBlock && <p className="text-center text-sm text-amber-200">♟️ {chessBlock}</p>}
+          {c4Block && <p className="text-center text-sm text-amber-200">🔴 {c4Block}</p>}
+          {dominoBlock && <p className="text-center text-sm text-amber-200">🁫 {dominoBlock}</p>}
           {spyBlock && !alone && <p className="text-center text-sm text-amber-200">🕵️ {spyBlock}</p>}
         </div>
       ) : (

@@ -19,7 +19,7 @@ export function TeamSettings({ room, busy, run }: { room: Room; busy: boolean; r
     { count: 4, label: "4 فرق" },
     { count: 5, label: "5 فرق" },
     { count: 6, label: "6 فرق" },
-  ].filter((o) => room.game !== "chess" || o.count == null || o.count === 2); // الشطرنج: فردي أو فريقان
+  ].filter((o) => (room.game !== "chess" && room.game !== "connect4") || o.count == null || o.count === 2); // الشطرنج وأربعة على التوالي: فردي أو فريقان
   return (
     <section className="rounded-3xl border border-white/10 bg-white/5 p-4">
       <h2 className="mb-3 font-bold">وضع اللعب</h2>
@@ -63,7 +63,7 @@ export function TeamSettings({ room, busy, run }: { room: Room; busy: boolean; r
             ? "كل فريق له لون، وأي عضو فيه يختار الجزيرة ويجيب (أول إجابة من الفريق هي إجابته)."
             : room.game === "chess"
               ? "في كل فريق قائد يحرك (أول من دخل، ويمكن تغييره أثناء اللعب)، والباقون يقترحون عليه الحركات."
-              : room.game === "ludo"
+              : room.game === "ludo" || room.game === "snakes"
                 ? "كل فريق له لون وقطعة واحدة، وأي عضو فيه يرمي ويجيب في دوره."
                 : room.play_mode === "turns"
                   ? "الأدوار تتناوب بين الفرق. الفائز هو الفريق صاحب أعلى مجموع نقاط."

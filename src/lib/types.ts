@@ -1,3 +1,6 @@
+import type { SnakesState } from "./snakes";
+import type { DominoState } from "./domino";
+
 export type RoomStatus =
   | "lobby"
   | "picking"
@@ -52,7 +55,7 @@ export interface Room {
   /** عدد الفرق في وضع الفرق */
   team_count: number | null;
   /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت أو لودو */
-  game: "quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy";
+  game: "quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy" | "bank" | "snakes" | "connect4" | "domino";
   /** حالة لودو (انظر 0016_ludo_quiz.sql) */
   ludo: LudoState | null;
   /** حالة الشطرنج (انظر 0019_chess.sql) */
@@ -61,6 +64,14 @@ export interface Room {
   pirate: PirateState | null;
   /** حالة الجاسوس (انظر 0023_spy.sql) */
   spy: SpyState | null;
+  /** حالة إمبراطورية المدن (انظر 0026_bank.sql) */
+  bank: BankState | null;
+  /** حالة أربعة على التوالي (انظر 0028_connect4.sql) */
+  c4: C4State | null;
+  /** حالة سلم وثعبان (انظر 0027_snakes_ladders.sql) */
+  snakes: SnakesState | null;
+  /** حالة الدومينو العامة (انظر 0029_domino.sql). يد كل لاعب لا تُرسل هنا */
+  domino: DominoState | null;
   /** أتوبيس كومبليت: الخانات وحرف الجولة */
   stop_categories: string[] | null;
   stop_letter: string | null;
@@ -220,6 +231,76 @@ export interface SpyState {
     winner: "spies" | "town";
   } | null;
   seq?: number;
+}
+
+export interface BankEvent {
+  type:
+    | "roll"
+    | "buy"
+    | "skip"
+    | "rent"
+    | "upgrade"
+    | "quiz"
+    | "buy_challenge"
+    | "rent_challenge"
+    | "tax"
+    | "treasure"
+    | "bankrupt";
+  p: number;
+  sq?: number;
+  owner?: number;
+  amount?: number | null;
+  ok?: boolean;
+  level?: number;
+  dice?: [number, number];
+  from?: number;
+  to?: number;
+  start?: boolean;
+}
+
+/** حالة إمبراطورية المدن (انظر 0026_bank.sql) */
+export interface BankState {
+  rounds: number;
+  start_cash: number;
+  players?: string[];
+  cash?: number[];
+  pos?: number[];
+  out?: boolean[];
+  props?: { o: number | null; lv: number }[];
+  round?: number;
+  turn?: number;
+  phase?: "roll" | "buy" | "rent" | "upgrade" | "question" | "reveal" | "done";
+  dice?: [number, number] | null;
+  pending?: {
+    sq?: number;
+    owner?: number;
+    rent?: number;
+    cost?: number;
+    kind?: "buy" | "rent" | "quiz";
+    ok?: boolean;
+    choice?: number | null;
+  } | null;
+  result?: { worth: number[]; winner: number | null } | null;
+  seq?: number;
+  last?: BankEvent | null;
+  log?: BankEvent[];
+}
+
+/** حالة أربعة على التوالي (انظر 0028_connect4.sql) */
+export interface C4State {
+  mode: "quiz" | "classic";
+  sides?: { team: number | null; user: string | null }[];
+  /** 42 حرفاً: 0 فارغ، 1 و 2 للطرفين. المربع (صف r من الأعلى، عمود c) في r*7+c */
+  grid?: string;
+  turn?: number;
+  phase?: "question" | "reveal" | "drop" | "done";
+  ok?: boolean | null;
+  choice?: number | null;
+  last?: { col: number; row: number; side: number } | null;
+  win?: number[] | null;
+  winner?: number | null;
+  seq?: number;
+  last_event?: { type: "drop" | "win" | "draw" | "correct" | "wrong" | "timeout"; side?: number; col?: number } | null;
 }
 
 export interface Player {
