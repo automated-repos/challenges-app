@@ -1,6 +1,7 @@
 import { rankPlayers, type Player, type Room } from "@/lib/types";
 import { rankTeams, teamInfo } from "@/lib/teams";
 import { Avatar } from "../ui";
+import { KickButton, OnlineDot } from "./RoomPeople";
 import { GiftPoints } from "./GiftPoints";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
@@ -108,6 +109,7 @@ function PlayerRow({
       } ${locked ? "opacity-40" : ""}`}
     >
       {label && <span className="w-5 text-center text-sm text-indigo-200">{label}</span>}
+      <OnlineDot userId={p.user_id} />
       <Avatar emoji={p.avatar} size="sm" />
       <span className="flex-1 truncate">
         {buzzing && "🔔 "}
@@ -116,6 +118,7 @@ function PlayerRow({
       <span dir="ltr" className={`font-bold tabular-nums ${p.score < 0 ? "text-red-300" : ""}`}>
         {p.score}
       </span>
+      <KickButton userId={p.user_id} name={p.name} />
     </li>
   );
 }

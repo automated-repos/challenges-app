@@ -6,6 +6,7 @@ import { errorMessage } from "@/lib/supabase";
 import { copyText, roomLink } from "@/lib/roomCode";
 import { DIFFICULTIES, type Player, type Room } from "@/lib/types";
 import { Avatar, ErrorBox } from "../ui";
+import { KickButton, OnlineDot } from "./RoomPeople";
 import { LobbyTeams, TeamSettings } from "./LobbyTeams";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
@@ -294,11 +295,13 @@ export function Lobby({
                       : "bg-white/5"
                 }`}
               >
+                <OnlineDot userId={p.user_id} />
                 <Avatar emoji={p.avatar} size="sm" />
                 <span className="flex-1 truncate">
                   {p.name}
                   {p.user_id === room.host_id && " 👑"}
                 </span>
+                <KickButton userId={p.user_id} name={p.name} />
                 {p.user_id !== room.host_id && (
                   <span title={p.ready ? "جاهز" : "لم يجهز بعد"} className="text-sm">
                     {p.ready ? "✅" : "⏳"}

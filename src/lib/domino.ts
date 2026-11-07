@@ -4,7 +4,7 @@
 export type Tile = [number, number];
 
 export interface DominoEvent {
-  type: "correct" | "pass" | "wrong" | "timeout" | "play" | "finish";
+  type: "correct" | "pass" | "wrong" | "timeout" | "play" | "finish" | "left";
   by: string | null;
   choice?: number | null;
   /** عدد القطع المسحوبة من البنك */
@@ -12,12 +12,12 @@ export interface DominoEvent {
   points?: number;
   tile?: Tile;
   side?: "left" | "right";
-  /** finish: domino = أنهى قطعه، blocked = اللعبة قُفلت */
-  reason?: "domino" | "blocked";
+  /** finish: domino = أنهى قطعه، blocked = اللعبة قُفلت، left = لم يبقَ إلا لاعب واحد */
+  reason?: "domino" | "blocked" | "left";
 }
 
 export interface DominoResult {
-  reason: "domino" | "blocked";
+  reason: "domino" | "blocked" | "left";
   /** المعرفات بالترتيب: الأول أولاً */
   rank: string[];
   /** يد كل لاعب في النهاية بترتيب الأدوار */

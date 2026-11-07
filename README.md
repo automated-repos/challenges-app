@@ -38,8 +38,9 @@
 28. [`supabase/migrations/0028_connect4.sql`](supabase/migrations/0028_connect4.sql): أربعة على التوالي
 29. [`supabase/migrations/0029_domino.sql`](supabase/migrations/0029_domino.sql): دومينو الأسئلة
 30. [`supabase/migrations/0030_rematch.sql`](supabase/migrations/0030_rematch.sql): لعبة جديدة لنفس اللاعبين بدون رمز جديد
-31. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
-32. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
+31. [`supabase/migrations/0031_kick.sql`](supabase/migrations/0031_kick.sql): إخراج اللاعبين (يدوياً أو عند انقطاع الاتصال)
+32. [`supabase/seed.sql`](supabase/seed.sql) ثم [`supabase/seed_more.sql`](supabase/seed_more.sql): الأسئلة (520 سؤالاً في 14 مجالاً)
+33. [`supabase/seed_difficulty.sql`](supabase/seed_difficulty.sql): تصنيف الأسئلة (225 سهل، 217 متوسط، 78 صعب)
 
 ثم من **Authentication → Sign In / Providers → Email**:
 - تأكد أن **Email** مفعّل
@@ -162,6 +163,12 @@ supabase functions deploy chess-move --no-verify-jwt
 
 ## لعبة جديدة لنفس اللاعبين 🎮
 بعد انتهاء أي لعبة (أو من غرفة الانتظار) يضغط منشئ الغرفة **🎮 لعبة جديدة لنفس اللاعبين**، فيختار أي لعبة وإعداداتها، وكل اللاعبين ينتقلون للغرفة الجديدة تلقائياً بدون رمز جديد. هناك يمكن تغيير الفرق وغيرها كالعادة.
+
+## إخراج اللاعبين 🚪
+- بجانب كل اسم نقطة: 🟢 متصل، ⚪ انقطع اتصاله.
+- منشئ الغرفة يستطيع إخراج أي لاعب بزر ✖ بجانب اسمه (في غرفة الانتظار وجدول الترتيب).
+- من ينقطع اتصاله أكثر من 10 ثوانٍ يُخرج تلقائياً (يحتاج أن يكون منشئ الغرفة متصلاً)، ويستطيع الدخول من جديد بنفس الرمز.
+- يخرج من اللعبة الجارية أيضاً: لونه يخرج من أدوار لودو وسلم وثعبان، وقطعه تعود لبنك الدومينو، وفي إمبراطورية المدن يُعامل كمفلس، وفي الشطرنج وأربعة على التوالي تنتهي اللعبة.
 
 ## التثبيت على الهاتف
 الموقع قابل للتثبيت كتطبيق: على أندرويد يظهر زر **📲 ثبّت التطبيق** في الصفحة الرئيسية (أو من قائمة Chrome ← تثبيت التطبيق). على آيفون: Safari ← زر المشاركة ← **إضافة إلى الشاشة الرئيسية**.

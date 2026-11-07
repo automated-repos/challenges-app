@@ -6,12 +6,19 @@ import type { Player, Room } from "@/lib/types";
 
 type Phase = "loading" | "need-join" | "ready" | "error";
 
+/** من ينقطع اتصاله أطول من هذا يُخرج من الغرفة (تكفي لتحديث الصفحة أو تقطع قصير) */
+const DISCONNECT_GRACE_MS = 10_000;
+
 export function useRoom(code: string, userId: string) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("");
   const [room, setRoom] = useState<Room | null>(null);
   const [players, setPlayers] = useState<Player[]>([]);
   const [reloadKey, setReloadKey] = useState(0);
+  // أُخرجنا من الغرفة (منشئها أخرجنا أو انقطع اتصالنا): نعرض شاشة الانضمام من جديد
+  const [kicked, setKicked] = useState(false);
+  // المتصلون الآن (Realtime Presence)
+  const [online, setOnline] = useState<Set<string> | null>(null);
   const offset = useServerOffset();
 
   // التحميل الأول: هل أنا عضو في هذه الغرفة؟
@@ -45,8 +52,16 @@ export function useRoom(code: string, userId: string) {
   const refreshPlayers = useCallback(async () => {
     if (!roomId) return;
     const { data } = await getSupabase().from("players").select("*").eq("room_id", roomId);
-    if (data) setPlayers(data as Player[]);
-  }, [roomId]);
+    if (!data) return;
+    // لم نعد في القائمة: أُخرجنا من الغرفة
+    if (!data.some((p) => p.user_id === userId)) {
+      setKicked(true);
+      setRoom(null);
+      setPhase("need-join");
+      return;
+    }
+    setPlayers(data as Player[]);
+  }, [roomId, userId]);
 
   const refreshRoom = useCallback(async () => {
     if (!roomId) return;
@@ -101,6 +116,48 @@ export function useRoom(code: string, userId: string) {
     };
   }, [roomId, refreshPlayers, refreshRoom]);
 
+  // من المتصل الآن: كل متصفح يعلن وجوده في قناة الغرفة
+  useEffect(() => {
+    if (!roomId) return;
+    const sb = getSupabase();
+    const channel = sb.channel(`presence-${roomId}`, { config: { presence: { key: userId } } });
+    channel
+      .on("presence", { event: "sync" }, () => setOnline(new Set(Object.keys(channel.presenceState()))))
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") channel.track({ at: Date.now() });
+      });
+    return () => {
+      sb.removeChannel(channel);
+    };
+  }, [roomId, userId]);
+
+  // منشئ الغرفة يُخرج تلقائياً من انقطع اتصاله (بعد مهلة قصيرة تكفي لتحديث الصفحة)
+  const isHost = room?.host_id === userId;
+  const kickTimers = useRef(new Map<string, ReturnType<typeof setTimeout>>());
+  useEffect(() => {
+    const timers = kickTimers.current;
+    if (!isHost || !online || !roomId) return;
+    for (const p of players) {
+      if (p.user_id === userId) continue;
+      if (online.has(p.user_id)) {
+        clearTimeout(timers.get(p.user_id));
+        timers.delete(p.user_id);
+      } else if (!timers.has(p.user_id)) {
+        timers.set(
+          p.user_id,
+          setTimeout(() => {
+            timers.delete(p.user_id);
+            getSupabase().rpc("kick_player", { p_room: roomId, p_user: p.user_id });
+          }, DISCONNECT_GRACE_MS),
+        );
+      }
+    }
+  }, [isHost, online, players, roomId, userId]);
+  useEffect(() => {
+    const timers = kickTimers.current;
+    return () => timers.forEach((t) => clearTimeout(t));
+  }, []);
+
   // عندما ينتهي أي عدّاد، أي متصفح يطلب من القاعدة الانتقال للمرحلة التالية
   const lastTick = useRef(0);
   useEffect(() => {
@@ -134,11 +191,12 @@ export function useRoom(code: string, userId: string) {
   const join = useCallback(async () => {
     const { error } = await getSupabase().rpc("join_room", { p_code: code });
     if (error) throw error;
+    setKicked(false);
     setPhase("loading");
     setReloadKey((k) => k + 1);
   }, [code]);
 
-  return { phase, error, room, players, offset, join, call };
+  return { phase, error, room, players, offset, join, call, online, kicked };
 }
 
 /** نتجاهل التحديثات الأقدم (قد تصل نتيجة التحديث الدوري بعد التحديث اللحظي) */

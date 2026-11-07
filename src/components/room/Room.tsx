@@ -11,6 +11,7 @@ import { Avatar, Center, ErrorBox } from "../ui";
 import { useAuth } from "../auth/useAuth";
 import { AuthForm } from "../auth/AuthForm";
 import { useRoom } from "./useRoom";
+import { RoomPeopleContext } from "./RoomPeople";
 import { Lobby } from "./Lobby";
 import { QuestionView } from "./QuestionView";
 import { PickCategory } from "./PickCategory";
@@ -65,7 +66,7 @@ function AuthGate({ code }: { code: string }) {
 }
 
 function RoomInner({ code, userId, profile }: { code: string; userId: string; profile: Profile }) {
-  const { phase, error, room, players, offset, join, call } = useRoom(code, userId);
+  const { phase, error, room, players, offset, join, call, online, kicked } = useRoom(code, userId);
   const router = useRouter();
   const nextCode = room?.next_code ?? null;
 
@@ -95,137 +96,151 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
         </Link>
       </Center>
     );
-  if (phase === "need-join" || !room) return <JoinGate code={code} profile={profile} onJoin={join} />;
+  if (phase === "need-join" || !room) return <JoinGate code={code} profile={profile} onJoin={join} kicked={kicked} />;
 
   const isHost = room.host_id === userId;
 
   return (
-    <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-6">
-      <header className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-6 sm:gap-3">
-        <Link href="/" className="text-lg font-black sm:text-xl">
-          🏆 تحدي الأسئلة
-        </Link>
-        <div className="flex items-center gap-3">
-          <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-1.5 text-sm">
-            <span className="text-indigo-200">رمز الغرفة</span>
-            <span dir="ltr" className="font-mono text-lg font-bold tracking-widest">
-              {room.code}
-            </span>
+    <RoomPeopleContext.Provider
+      value={{ online, canKick: isHost, hostId: room.host_id, kick: (u) => call("kick_player", { p_user: u }) }}
+    >
+      <main className="mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-6">
+        <header className="mb-3 flex flex-wrap items-center justify-between gap-2 sm:mb-6 sm:gap-3">
+          <Link href="/" className="text-lg font-black sm:text-xl">
+            🏆 تحدي الأسئلة
+          </Link>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2 rounded-xl bg-white/5 px-3 py-1.5 text-sm">
+              <span className="text-indigo-200">رمز الغرفة</span>
+              <span dir="ltr" className="font-mono text-lg font-bold tracking-widest">
+                {room.code}
+              </span>
+            </div>
+            <Avatar emoji={profile.avatar} size="sm" />
           </div>
-          <Avatar emoji={profile.avatar} size="sm" />
-        </div>
-      </header>
+        </header>
 
-      <VoiceChat roomId={room.id} {...voiceChannel(room, players, userId)} />
+        <VoiceChat roomId={room.id} {...voiceChannel(room, players, userId)} />
 
-      {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
+        {room.status === "lobby" && <Lobby room={room} players={players} userId={userId} isHost={isHost} call={call} />}
 
-      {room.status === "playing" && room.game === "domino" && room.domino && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <DominoGame
-            room={room}
-            state={room.domino}
-            players={players}
-            userId={userId}
-            isHost={isHost}
-            offset={offset}
-            call={call}
-          />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {room.status === "playing" && room.game === "connect4" && room.c4 && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <Connect4Game room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {room.status === "playing" && room.game === "bank" && room.bank && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <BankGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {room.status === "playing" && room.game === "spy" && room.spy && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <SpyGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {room.status === "playing" && room.game === "pirate" && room.pirate && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <PirateGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {room.status === "playing" && room.game === "chess" && room.chess && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <ChessGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {room.status === "playing" && room.game === "snakes" && room.snakes && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <SnakesGame
-            room={room}
-            state={room.snakes}
-            players={players}
-            userId={userId}
-            isHost={isHost}
-            offset={offset}
-            call={call}
-          />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {room.status === "playing" && room.game === "ludo" && room.ludo && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <LudoGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {(room.status === "writing" || room.status === "voting" || room.status === "round_end") && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          <StopGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
-
-      {(room.status === "question" || room.status === "reveal" || room.status === "picking") && (
-        <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
-          {room.status === "picking" ? (
-            <PickCategory room={room} players={players} userId={userId} offset={offset} call={call} />
-          ) : (
-            <QuestionView
-              key={room.current_index}
+        {room.status === "playing" && room.game === "domino" && room.domino && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <DominoGame
               room={room}
+              state={room.domino}
               players={players}
               userId={userId}
               isHost={isHost}
               offset={offset}
               call={call}
             />
-          )}
-          <Scoreboard players={players} userId={userId} room={room} call={call} />
-        </div>
-      )}
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
 
-      {room.status === "finished" && <Results players={players} userId={userId} room={room} />}
+        {room.status === "playing" && room.game === "connect4" && room.c4 && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <Connect4Game room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
 
-      <RoomChat roomId={room.id} userId={userId} inGame={room.status === "question" || room.status === "reveal"} />
-    </main>
+        {room.status === "playing" && room.game === "bank" && room.bank && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <BankGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {room.status === "playing" && room.game === "spy" && room.spy && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <SpyGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {room.status === "playing" && room.game === "pirate" && room.pirate && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <PirateGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {room.status === "playing" && room.game === "chess" && room.chess && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <ChessGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {room.status === "playing" && room.game === "snakes" && room.snakes && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <SnakesGame
+              room={room}
+              state={room.snakes}
+              players={players}
+              userId={userId}
+              isHost={isHost}
+              offset={offset}
+              call={call}
+            />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {room.status === "playing" && room.game === "ludo" && room.ludo && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <LudoGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {(room.status === "writing" || room.status === "voting" || room.status === "round_end") && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            <StopGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {(room.status === "question" || room.status === "reveal" || room.status === "picking") && (
+          <div className="grid gap-6 lg:grid-cols-[1fr_280px]">
+            {room.status === "picking" ? (
+              <PickCategory room={room} players={players} userId={userId} offset={offset} call={call} />
+            ) : (
+              <QuestionView
+                key={room.current_index}
+                room={room}
+                players={players}
+                userId={userId}
+                isHost={isHost}
+                offset={offset}
+                call={call}
+              />
+            )}
+            <Scoreboard players={players} userId={userId} room={room} call={call} />
+          </div>
+        )}
+
+        {room.status === "finished" && <Results players={players} userId={userId} room={room} />}
+
+        <RoomChat roomId={room.id} userId={userId} inGame={room.status === "question" || room.status === "reveal"} />
+      </main>
+    </RoomPeopleContext.Provider>
   );
 }
 
-function JoinGate({ code, profile, onJoin }: { code: string; profile: Profile; onJoin: () => Promise<void> }) {
+function JoinGate({
+  code,
+  profile,
+  onJoin,
+  kicked,
+}: {
+  code: string;
+  profile: Profile;
+  onJoin: () => Promise<void>;
+  kicked: boolean;
+}) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -244,6 +259,11 @@ function JoinGate({ code, profile, onJoin }: { code: string; profile: Profile; o
     <main className="mx-auto w-full max-w-md px-4 py-16">
       <div className="space-y-5 rounded-3xl border border-white/10 bg-white/5 p-6 text-center">
         <h1 className="text-2xl font-bold">الانضمام للغرفة</h1>
+        {kicked && (
+          <p className="rounded-2xl bg-amber-400/15 p-3 text-sm text-amber-100">
+            🔌 خرجت من الغرفة (انقطع اتصالك أو أخرجك منشئ الغرفة). اضغط انضمام للدخول من جديد.
+          </p>
+        )}
         <p dir="ltr" className="font-mono text-3xl tracking-[0.4em]">
           {code}
         </p>

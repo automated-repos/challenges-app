@@ -348,7 +348,13 @@ export function describe(e: DominoEvent, nameOf: (id?: string | null) => string)
     case "play":
       return `🁫 ${who} لعب [${e.tile?.[0]}|${e.tile?.[1]}]`;
     case "finish":
-      return e.reason === "domino" ? `🏆 ${who} خلّص قطعه!` : "🔒 اللعبة اتقفلت! الفائز صاحب أقل نقط في يده";
+      return e.reason === "domino"
+        ? `🏆 ${who} خلّص قطعه!`
+        : e.reason === "left"
+          ? `🏆 ${who} فاز لأن باقي اللاعبين خرجوا`
+          : "🔒 اللعبة اتقفلت! الفائز صاحب أقل نقط في يده";
+    case "left":
+      return `🚪 ${who} خرج من اللعبة ورجعت قطعه للبنك`;
   }
 }
 

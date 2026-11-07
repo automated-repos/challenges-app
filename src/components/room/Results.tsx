@@ -442,7 +442,12 @@ function DominoPlaces({ result, players, userId }: { result: DominoResult; playe
   return (
     <section className="space-y-2">
       <h2 className="text-center font-bold text-indigo-200">
-        🁫 {result.reason === "domino" ? "انتهت بإنهاء القطع" : "🔒 اللعبة اتقفلت: الأقل نقطاً يفوز"}
+        🁫{" "}
+        {result.reason === "domino"
+          ? "انتهت بإنهاء القطع"
+          : result.reason === "left"
+            ? "انتهت بخروج باقي اللاعبين"
+            : "🔒 اللعبة اتقفلت: الأقل نقطاً يفوز"}
       </h2>
       <ol className="space-y-2">
         {result.rank.map((u, k) => {

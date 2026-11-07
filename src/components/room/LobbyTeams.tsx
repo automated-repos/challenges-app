@@ -4,6 +4,7 @@ import type { MouseEvent } from "react";
 import { teamInfo, visibleTeamCount } from "@/lib/teams";
 import type { Player, Room } from "@/lib/types";
 import { Avatar } from "../ui";
+import { KickButton, OnlineDot } from "./RoomPeople";
 
 type Run = (fn: string, args?: Record<string, unknown>) => void;
 
@@ -177,11 +178,13 @@ function Member({
         p.user_id === userId ? "bg-white/15" : "bg-black/15"
       }`}
     >
+      <OnlineDot userId={p.user_id} />
       <Avatar emoji={p.avatar} size="sm" />
       <span className="flex-1 truncate text-sm">
         {p.name}
         {isHost && " 👑"}
       </span>
+      <KickButton userId={p.user_id} name={p.name} />
       {!isHost && (
         <span title={p.ready ? "جاهز" : "لم يجهز بعد"} className="text-sm">
           {p.ready ? "✅" : "⏳"}
