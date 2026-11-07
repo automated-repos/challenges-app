@@ -157,12 +157,9 @@ export function Lobby({
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
           {room.game === "domino" ? (
             <>
-              <span>🁫 دومينو الأسئلة</span>
+              <span>🁫 دومينو كلاسيكي</span>
               <span>2 إلى 4 لاعبين • 7 قطع لكل لاعب</span>
-              <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
-              <span>+{room.points_correct} للصحيحة</span>
-              <span>−{room.points_wrong} للخاطئة</span>
-              <span>{room.question_seconds} ث للإجابة</span>
+              <span>30 ث لكل دور</span>
             </>
           ) : room.game === "connect4" ? (
             <>

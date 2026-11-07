@@ -4,7 +4,7 @@
 export type Tile = [number, number];
 
 export interface DominoEvent {
-  type: "correct" | "pass" | "wrong" | "timeout" | "play" | "finish" | "left";
+  type: "draw" | "pass" | "play" | "finish" | "left" | "correct" | "wrong" | "timeout";
   by: string | null;
   choice?: number | null;
   /** عدد القطع المسحوبة من البنك */
@@ -32,6 +32,7 @@ export interface DominoState {
   chain?: Tile[];
   ends?: Tile | null;
   turn?: number;
+  /** play = صاحب الدور يختار قطعة، reveal = تمرير قصير. (question في النسخة القديمة فقط) */
   phase?: "question" | "play" | "reveal" | "done";
   seq?: number;
   last?: DominoEvent | null;

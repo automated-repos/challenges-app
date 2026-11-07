@@ -298,31 +298,15 @@ function LudoForm() {
 
 function DominoForm() {
   const afterCreate = useAfterCreate();
-  const [categories, setCategories] = useState<Category[] | null>(null);
-  const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
-  const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
-  const [seconds, setSeconds] = useState(20);
-  const [pointsCorrect, setPointsCorrect] = useState(10);
-  const [pointsWrong, setPointsWrong] = useState(5);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-
-  useEffect(() => {
-    loadCategories().then(setCategories, (e) => setError(errorMessage(e)));
-  }, []);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true);
     setError("");
     try {
-      const { data, error } = await getSupabase().rpc("create_domino_room", {
-        p_seconds: seconds,
-        p_points_correct: pointsCorrect,
-        p_points_wrong: pointsWrong,
-        p_category_ids: selected.length ? selected : null,
-        p_difficulty: difficulty,
-      });
+      const { data, error } = await getSupabase().rpc("create_domino_room", {});
       if (error) throw error;
       await afterCreate(data as string);
     } catch (err) {
@@ -334,22 +318,13 @@ function DominoForm() {
   return (
     <form onSubmit={submit} className="space-y-5">
       <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
-        دومينو الأسئلة: من 2 إلى 4 لاعبين، لكل لاعب 7 قطع لا يراها غيره. كل دور يبدأ بسؤال: الإجابة الصحيحة تعطيك نقاطاً
-        وتلعب قطعة تطابق أحد طرفي السلسلة (وإن لم تجد تسحب من البنك)، والخاطئة تخصم نقاطاً وتسحب قطعة عقاباً. أول من
-        يُنهي قطعه يفوز، وإن قُفلت اللعبة يفوز صاحب أقل نقط في يده.
+        دومينو كلاسيكي: من 2 إلى 4 لاعبين، لكل لاعب 7 قطع لا يراها غيره. في دورك العب قطعة تطابق أحد طرفي السلسلة، وإن
+        لم تجد تسحب من البنك تلقائياً. أول من يُنهي قطعه يفوز، وإن قُفلت اللعبة يفوز صاحب أقل نقط في يده.
         <br />
         مكافأة الترتيب: الأول +30، الثاني +20، الثالث +10.
       </p>
-
-      <DifficultyField value={difficulty} onChange={setDifficulty} />
-
-      <div className="grid grid-cols-2 gap-4">
-        <NumberField label="ثواني الإجابة" value={seconds} onChange={setSeconds} min={10} max={60} />
-        <NumberField label="نقاط الإجابة الصحيحة" value={pointsCorrect} onChange={setPointsCorrect} min={0} max={100} />
-        <NumberField label="خصم الإجابة الخاطئة" value={pointsWrong} onChange={setPointsWrong} min={0} max={100} />
-      </div>
       {error && <ErrorBox>{error}</ErrorBox>}
-      <button disabled={busy || !categories} className="btn-primary w-full">
+      <button disabled={busy} className="btn-primary w-full">
         {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
       </button>
     </form>
