@@ -1,5 +1,6 @@
 import type { SnakesState } from "./snakes";
 import type { DominoState } from "./domino";
+import type { Car } from "./bankBoard";
 
 export type RoomStatus =
   | "lobby"
@@ -238,41 +239,59 @@ export interface SpyState {
 export interface BankEvent {
   type:
     | "roll"
+    | "pass_start"
     | "buy"
     | "skip"
     | "rent"
+    | "build"
     | "upgrade"
     | "quiz"
     | "buy_challenge"
     | "rent_challenge"
     | "tax"
     | "treasure"
-    | "bankrupt";
+    | "card"
+    | "jail"
+    | "jail_skip"
+    | "bankrupt"
+    | "left";
   p: number;
   sq?: number;
   owner?: number;
   amount?: number | null;
   ok?: boolean;
   level?: number;
-  dice?: [number, number];
+  /** النسخة الثانية: زهر واحد (رقم)، والقديمة: زهران */
+  dice?: number | [number, number];
   from?: number;
   to?: number;
   start?: boolean;
+  /** buy: اكتملت المجموعة بهذا الشراء */
+  full?: boolean;
+  /** card: نوع البطاقة واسمها */
+  kind?: "luck" | "court";
+  card?: string;
 }
 
-/** حالة إمبراطورية المدن (انظر 0026_bank.sql) */
+/** حالة إمبراطورية المدن (انظر 0033_bank_v2.sql) */
 export interface BankState {
+  /** 0 = لعب لا نهائي حتى يفلس الجميع إلا واحداً */
   rounds: number;
   start_cash: number;
+  /** غرفة الانتظار: سيارة كل لاعب حسب معرّفه. أثناء اللعب: مصفوفة بترتيب اللاعبين */
+  cars?: Record<string, Car> | Car[];
+  version?: number;
   players?: string[];
   cash?: number[];
   pos?: number[];
   out?: boolean[];
+  /** عدد الأدوار التي تفوت اللاعب وهو في السجن */
+  jail?: number[];
   props?: { o: number | null; lv: number }[];
   round?: number;
   turn?: number;
   phase?: "roll" | "buy" | "rent" | "upgrade" | "question" | "reveal" | "done";
-  dice?: [number, number] | null;
+  dice?: number | [number, number] | null;
   pending?: {
     sq?: number;
     owner?: number;

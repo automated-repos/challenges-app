@@ -507,9 +507,9 @@ function BankForm() {
   const [categories, setCategories] = useState<Category[] | null>(null);
   const selected: number[] = []; // كل المجالات دائماً: الأسئلة عشوائية
   const [difficulty, setDifficulty] = useState<Difficulty | null>(null);
+  const [endless, setEndless] = useState(true);
   const [rounds, setRounds] = useState(15);
   const [startCash, setStartCash] = useState(1500);
-  const [seconds, setSeconds] = useState(20);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
@@ -523,9 +523,8 @@ function BankForm() {
     setError("");
     try {
       const { data, error } = await getSupabase().rpc("create_bank_room", {
-        p_rounds: rounds,
+        p_rounds: endless ? 0 : rounds,
         p_start_cash: startCash,
-        p_seconds: seconds,
         p_category_ids: selected.length ? selected : null,
         p_difficulty: difficulty,
       });
@@ -540,21 +539,35 @@ function BankForm() {
   return (
     <form onSubmit={submit} className="space-y-5">
       <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
-        🏙️ من 2 إلى 6 لاعبين. ارمِ الزهرين وتنقّل بين 16 مدينة عربية: اشترِ المدن، رقِّها، واجمع الإيجارات. أجب على
-        الأسئلة لتشتري بنصف السعر أو تدفع نصف الإيجار (والخطأ يضاعفه)، ومربعات ⭐ تعطيك +150 أو تأخذ 50. امتلاك
-        المدينتين من نفس اللون يضاعف إيجارهما. بعد الجولات يفوز الأغنى.
+        🏙️ من 2 إلى 6 لاعبين، كل لاعب بسيارته. ارمِ الزهر وتنقّل بين 16 مدينة عربية واشترِ المدن. اجمع مدينتي نفس اللون
+        لتبني 🅿️ جراج ← 🏨 استراحة ← 🏬 سوق (كل مبنى أغلى وإيجاره أعلى). مربعات 🍀 حظك اليوم و ⚖️ المحكمة فيها جوائز
+        وغرامات وقد تدخلك 🔒 السجن (يفوتك دور). أجب على الأسئلة لتشتري بنصف السعر أو تدفع نصف الإيجار، والسؤال مفتوح بلا
+        وقت.
       </p>
 
-      <Field label={`عدد الجولات: ${rounds}`}>
-        <input
-          type="range"
-          min={5}
-          max={40}
-          value={rounds}
-          onChange={(e) => setRounds(Number(e.target.value))}
-          className="w-full accent-amber-400"
-        />
+      <Field label="مدة اللعبة">
+        <div className="flex flex-wrap gap-2">
+          <Chip active={endless} onClick={() => setEndless(true)}>
+            ♾️ لا نهائي: حتى يفلس الجميع إلا واحداً
+          </Chip>
+          <Chip active={!endless} onClick={() => setEndless(false)}>
+            🔢 عدد جولات (يفوز الأغنى)
+          </Chip>
+        </div>
       </Field>
+
+      {!endless && (
+        <Field label={`عدد الجولات: ${rounds}`}>
+          <input
+            type="range"
+            min={5}
+            max={60}
+            value={rounds}
+            onChange={(e) => setRounds(Number(e.target.value))}
+            className="w-full accent-amber-400"
+          />
+        </Field>
+      )}
 
       <Field label="رصيد البداية">
         <div className="flex flex-wrap gap-2">
@@ -567,7 +580,6 @@ function BankForm() {
       </Field>
 
       <DifficultyField value={difficulty} onChange={setDifficulty} />
-      <NumberField label="ثواني كل سؤال" value={seconds} onChange={setSeconds} min={10} max={60} />
 
       {error && <ErrorBox>{error}</ErrorBox>}
       <button disabled={busy || !categories} className="btn-primary w-full">

@@ -8,6 +8,7 @@ import { DIFFICULTIES, type Player, type Room } from "@/lib/types";
 import { Avatar, ErrorBox } from "../ui";
 import { KickButton, OnlineDot } from "./RoomPeople";
 import { LobbyTeams, TeamSettings } from "./LobbyTeams";
+import { CarPicker } from "./CarPicker";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -175,10 +176,10 @@ export function Lobby({
           ) : room.game === "bank" ? (
             <>
               <span>🏙️ إمبراطورية المدن</span>
-              <span>{room.bank?.rounds ?? room.total_questions} جولة</span>
+              <span>{room.bank?.rounds ? `${room.bank.rounds} جولة` : "♾️ لا نهائي"}</span>
               <span>💵 {room.bank?.start_cash ?? 1500} رصيد البداية</span>
               <span>{DIFFICULTIES.find((d) => d.value === (room.difficulty ?? null))?.label}</span>
-              <span>{room.question_seconds} ث لكل سؤال</span>
+              <span>❓ الأسئلة بلا وقت</span>
             </>
           ) : room.game === "spy" ? (
             <>
@@ -263,6 +264,8 @@ export function Lobby({
           )}
         </div>
       </section>
+
+      {room.game === "bank" && <CarPicker room={room} players={players} userId={userId} call={call} />}
 
       {isHost && room.game !== "stop" && room.game !== "spy" && room.game !== "bank" && room.game !== "domino" && (
         <TeamSettings room={room} busy={busy} run={run} />

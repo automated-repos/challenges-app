@@ -10,7 +10,8 @@ import {
   type Room,
 } from "@/lib/types";
 import { islandCount, pirateSideName } from "./PirateGame";
-import { bankColor, bankStandings } from "./BankGame";
+import { bankStandings, carOf } from "./BankGame";
+import { CarIcon } from "./CarIcon";
 import { C4_COLORS, c4SideName } from "./Connect4Game";
 import type { SnakesState } from "@/lib/snakes";
 import type { DominoResult } from "@/lib/domino";
@@ -338,9 +339,13 @@ function BankResult({ bank, players, userId }: { bank: BankState; players: Playe
       <div className="animate-pop rounded-3xl border border-amber-300/50 bg-amber-400/15 p-5 text-center">
         <div className="text-5xl">🏙️</div>
         <p className="mt-2 text-2xl font-black">
-          {winner != null ? `أغنى رجل أعمال: ${name(winner)}!` : "تعادل في الثروة"}
+          {winner != null
+            ? !bank.rounds
+              ? `${name(winner)} آخر من صمد وفاز! 🏆`
+              : `أغنى رجل أعمال: ${name(winner)}!`
+            : "تعادل في الثروة"}
         </p>
-        <p className="mt-1 text-indigo-100">الثروة = النقود + قيمة المدن وترقياتها</p>
+        <p className="mt-1 text-indigo-100">الثروة = النقود + قيمة المدن ومبانيها</p>
       </div>
       <ol className="space-y-2">
         {standings.map(({ i, worth }, k) => (
@@ -351,7 +356,7 @@ function BankResult({ bank, players, userId }: { bank: BankState; players: Playe
             }`}
           >
             <span className="w-8 text-center text-2xl">{MEDALS[k] ?? k + 1}</span>
-            <span className="h-4 w-4 rounded-full" style={{ background: bankColor(i) }} />
+            <CarIcon shape={carOf(bank, i).shape} color={carOf(bank, i).color} size={14} />
             <span className="flex-1 truncate font-black">{name(i)}</span>
             <span className="text-sm text-indigo-200" dir="ltr">
               {bank.out?.[i] ? "💸 أفلس" : `${worth.toLocaleString("en-US")} 💵`}
