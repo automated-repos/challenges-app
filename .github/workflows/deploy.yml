@@ -21,8 +21,9 @@ jobs:
       # المفتاح العام (publishable) آمن للنشر: يظهر في المتصفح لكل الزوار أصلاً
       NEXT_PUBLIC_SUPABASE_URL: https://omuqbocsbkkzakboegfq.supabase.co
       NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_6z09nk03YCQpmsEEssSvDQ_r1CsK04v
-      # الموقع يُنشر تحت /اسم-المستودع
-      BASE_PATH: /${{ github.event.repository.name }}
+      # الموقع على نطاق خاص (games.elawady.site) فيُنشر من الجذر بلا مسار.
+      # للرجوع إلى automated-repos.github.io/challenges-app ضع: /${{ github.event.repository.name }}
+      BASE_PATH: ""
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
