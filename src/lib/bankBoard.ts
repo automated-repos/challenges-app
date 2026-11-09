@@ -74,6 +74,26 @@ export function fullGroup(props: BankProp[], sq: number): boolean {
 
 const LEVEL_MULT = [1, 5, 12, 25];
 
+/** عدد المباني في اللعبة كلها (نفس _bank_stock_total): 8 جراجات، 5 استراحات، 3 أسواق */
+export const STOCK_TOTAL: Record<number, number> = { 1: 8, 2: 5, 3: 3 };
+
+/** الباقي في المخزون من مبنى المستوى (نفس _bank_stock_left) */
+export function stockLeft(props: BankProp[], level: number): number {
+  return STOCK_TOTAL[level] - props.filter((p) => p.lv === level).length;
+}
+
+/** أفضل مدينة عند اللاعب تستقبل مبنى هذا المستوى (نفس _bank_auction_target) */
+export function auctionTarget(props: BankProp[], i: number, level: number): number | null {
+  let best: number | null = null;
+  props.forEach((pr, sq) => {
+    const s = BANK_BOARD[sq];
+    if (pr.o !== i || pr.lv >= level || s.t !== "city" || !fullGroup(props, sq)) return;
+    const b = best == null ? null : BANK_BOARD[best];
+    if (b == null || (b.t === "city" && s.p > b.p)) best = sq;
+  });
+  return best;
+}
+
 /** الإيجار (نفس _bank_rent): عُشر السعر × 1 (أو 2 للمجموعة الكاملة)، 5 جراج، 12 استراحة، 25 سوق */
 export function rentAt(price: number, lv: number, full: boolean): number {
   return Math.floor(price / 10) * (lv === 0 ? (full ? 2 : 1) : LEVEL_MULT[lv]);

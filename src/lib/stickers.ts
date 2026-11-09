@@ -82,7 +82,6 @@ export const STICKERS: Sticker[] = [
   { id: "snd_yamaa", kind: "sound", file: "yamaa.mp3", label: "يامااااا", emoji: "😱" },
   { id: "snd_ayez_anam", kind: "sound", file: "ayez_anam.mp3", label: "انا عايز انام", emoji: "😴" },
   { id: "snd_allahu_akbar", kind: "sound", file: "allahu_akbar_alek.mp3", label: "الله اكبر عليك", emoji: "🤲" },
-  { id: "snd_cat_laugh", kind: "sound", file: "cat_laugh.mp3", label: "ضحكة القطة", emoji: "😹" },
   { id: "snd_samo_aleko", kind: "sound", file: "samo_aleko.mp3", label: "سامو عليكو", emoji: "👋" },
   { id: "snd_dammartni", kind: "sound", file: "dammartni.mp3", label: "دمرتني", emoji: "💥" },
   { id: "snd_enta_mnen", kind: "sound", file: "enta_mnen.mp3", label: "انت منين؟ انت من فرنسا؟", emoji: "🇫🇷" },

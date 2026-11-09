@@ -254,7 +254,15 @@ export interface BankEvent {
     | "jail"
     | "jail_skip"
     | "bankrupt"
-    | "left";
+    | "left"
+    // 0034: الشراء من المالك والمزاد
+    | "offer"
+    | "offer_rejected"
+    | "trade"
+    | "auction"
+    | "auction_sold"
+    | "auction_none"
+    | "moved";
   p: number;
   sq?: number;
   owner?: number;
@@ -271,6 +279,20 @@ export interface BankEvent {
   /** card: نوع البطاقة واسمها */
   kind?: "luck" | "court";
   card?: string;
+  /** المزاد: مدينة أو مبنى، والمدينة التي استقبلت المبنى */
+  what?: "city" | "building";
+  to_sq?: number | null;
+}
+
+/** المزاد الجاري (انظر 0034_bank_trade.sql) */
+export interface BankAuction {
+  seller: number;
+  sq: number;
+  what: "city" | "building";
+  level: number;
+  min: number;
+  bid: number | null;
+  bidder: number | null;
 }
 
 /** حالة إمبراطورية المدن (انظر 0033_bank_v2.sql) */
@@ -290,7 +312,8 @@ export interface BankState {
   props?: { o: number | null; lv: number }[];
   round?: number;
   turn?: number;
-  phase?: "roll" | "buy" | "rent" | "upgrade" | "question" | "reveal" | "done";
+  phase?:
+    "roll" | "move" | "buy" | "rent" | "upgrade" | "question" | "reveal" | "offer" | "notice" | "auction" | "done";
   dice?: number | [number, number] | null;
   pending?: {
     sq?: number;
@@ -300,6 +323,15 @@ export interface BankState {
     kind?: "buy" | "rent" | "quiz";
     ok?: boolean;
     choice?: number | null;
+    /** عرض الشراء: المبلغ المعروض، وعدد العروض، وآخر عرض مرفوض */
+    offer?: number;
+    offers?: number;
+    rejected?: number;
+    /** بطاقة "علم": أحداث الدور والنقود قبله وبعده */
+    events?: BankEvent[];
+    before?: number[];
+    after?: number[];
+    auction?: BankAuction;
   } | null;
   result?: { worth: number[]; winner: number | null } | null;
   seq?: number;

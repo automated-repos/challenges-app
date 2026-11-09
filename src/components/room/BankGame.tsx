@@ -9,8 +9,11 @@ import {
   GROUP_COLORS,
   bankRent,
   bankWorth,
+  auctionTarget,
   buildCost,
   buildingOf,
+  STOCK_TOTAL,
+  stockLeft,
   fullGroup,
   rentAt,
   type BankProp,
@@ -27,6 +30,7 @@ type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 // مدة القرار والكشف (يجب أن تطابق 0033_bank_v2.sql). السؤال بلا وقت
 const DECIDE_SECONDS = 30;
 const REVEAL_SECONDS = 4;
+const AUCTION_SECONDS = 20;
 
 const money = (n: number) => `${n.toLocaleString("en-US")} 💵`;
 
@@ -100,7 +104,7 @@ export function BankGame({
     }
   }
 
-  const total = b.phase === "reveal" ? REVEAL_SECONDS : DECIDE_SECONDS;
+  const total = b.phase === "reveal" ? REVEAL_SECONDS : b.phase === "auction" ? AUCTION_SECONDS : DECIDE_SECONDS;
   const endless = !b.rounds;
 
   return (
@@ -131,7 +135,26 @@ export function BankGame({
         })}
       </ul>
 
-      <Board b={b} props={props} order={order} name={name} />
+      <Board
+        b={b}
+        props={props}
+        order={order}
+        name={name}
+        onPick={myTurn && b.phase === "move" && !busy ? (sq) => act("bank_move", { p_sq: sq }) : undefined}
+      />
+
+      {/* المخزون المحدود من المباني */}
+      <p className="text-center text-sm text-indigo-200">
+        المخزون:{" "}
+        {[1, 2, 3].map((lv) => {
+          const left = stockLeft(props, lv);
+          return (
+            <span key={lv} className={`mx-1 inline-block ${left === 0 ? "text-rose-300" : "text-white"}`}>
+              {buildingOf(lv)?.icon} {left}/{STOCK_TOTAL[lv]}
+            </span>
+          );
+        })}
+      </p>
 
       <div className="space-y-3 rounded-3xl border border-white/10 bg-white/5 p-4 text-center">
         <p className="text-sm text-indigo-200">
@@ -145,7 +168,13 @@ export function BankGame({
           busy={busy}
           name={name}
           props={props}
+          isHost={isHost}
           onRoll={() => act("bank_roll")}
+          onOffer={(amount) => act("bank_offer", { p_amount: amount })}
+          onReply={(accept) => act("bank_offer_reply", { p_accept: accept })}
+          onAck={() => act("bank_ack")}
+          onAuction={(sq, what, min) => act("bank_auction_start", { p_sq: sq, p_what: what, p_min: min })}
+          onBid={(amount) => act("bank_bid", { p_amount: amount })}
           onBuild={(sq) => act("bank_build", { p_sq: sq })}
           onDecide={(c) => act("bank_decide", { p_choice: c })}
           onAnswer={(i) => act("bank_answer", { p_choice: i })}
@@ -199,10 +228,16 @@ function TurnPanel({
   busy,
   name,
   props,
+  isHost,
   onRoll,
   onBuild,
   onDecide,
   onAnswer,
+  onOffer,
+  onReply,
+  onAck,
+  onAuction,
+  onBid,
 }: {
   room: Room;
   b: BankState;
@@ -211,7 +246,13 @@ function TurnPanel({
   busy: boolean;
   name: (i: number | undefined) => string;
   props: BankProp[];
+  isHost: boolean;
   onRoll: () => void;
+  onOffer: (amount: number) => void;
+  onReply: (accept: boolean) => void;
+  onAck: () => void;
+  onAuction: (sq: number, what: "city" | "building", min: number) => void;
+  onBid: (amount: number) => void;
   onBuild: (sq: number) => void;
   onDecide: (choice: string) => void;
   onAnswer: (i: number) => void;
@@ -246,20 +287,23 @@ function TurnPanel({
                 <button
                   key={i}
                   onClick={() => onBuild(i)}
-                  disabled={busy || myCash < cost}
+                  disabled={busy || myCash < cost || stockLeft(props, next.level) <= 0}
                   className="flex w-full items-center justify-between gap-2 rounded-xl bg-white/10 px-3 py-2 text-sm transition hover:bg-white/20 disabled:opacity-40"
                 >
                   <span className="font-bold">
                     {next.icon} {next.name} في {s.n}
                   </span>
                   <span className="text-xs text-indigo-100">
-                    {money(cost)} • الإيجار يصبح {rentAt(s.p, next.level, true)}
+                    {stockLeft(props, next.level) <= 0
+                      ? "نفد المخزون"
+                      : `${money(cost)} • الإيجار يصبح ${rentAt(s.p, next.level, true)}`}
                   </span>
                 </button>
               );
             })}
           </div>
         )}
+        <AuctionStart b={b} me={me} busy={busy} onStart={onAuction} />
         <Die value={diceValue(b.dice)} />
         <button onClick={onRoll} disabled={busy} className="btn-primary px-8 py-3 text-lg">
           🎲 ارمِ الزهر
@@ -320,10 +364,82 @@ function TurnPanel({
             </button>
           </div>
         ) : (
-          <p className="text-sm text-indigo-200">الإيجار {money(rent)}، يقرر هل يدفع أم يتحدى...</p>
+          <p className="text-sm text-indigo-200">الإيجار {money(rent)}، يقرر هل يدفع أم يتحدى أم يعرض الشراء...</p>
+        )}
+        {p?.rejected != null && (
+          <p className="text-sm text-rose-300">
+            ❌ رفض {name(p.owner)} عرض {money(p.rejected)}
+          </p>
+        )}
+        {myTurn && (
+          <OfferForm
+            key={`${sq}-${p?.offers ?? 0}`}
+            suggested={price + 50}
+            cash={myCash}
+            left={3 - (p?.offers ?? 0)}
+            busy={busy}
+            onOffer={onOffer}
+          />
         )}
       </>
     );
+  }
+
+  if (b.phase === "move") {
+    const d = diceValue(b.dice) ?? 0;
+    return (
+      <>
+        <Die value={d} />
+        {myTurn ? (
+          <>
+            <p className="text-lg font-black">🚗 رميت {d}! حرّك سيارتك بنفسك</p>
+            <p className="text-sm text-amber-200">
+              عُدّ {d} من مكان سيارتك (المربع المضيء) واضغط على المربع الذي تصل إليه في اللوحة
+            </p>
+          </>
+        ) : (
+          <p className="text-lg font-black">
+            🚗 {who} رمى {d} ويحرّك سيارته...
+          </p>
+        )}
+      </>
+    );
+  }
+
+  if (b.phase === "offer") {
+    const iOwn = me === p?.owner;
+    const building = buildingOf(props[sq]?.lv ?? 0);
+    return (
+      <div className="space-y-3">
+        <p className="text-lg font-black">
+          🤝 {myTurn ? "عرضت" : `${who} يعرض`} شراء {squareName(sq)}
+          {building && ` (${building.icon} ${building.name})`} بـ {money(p?.offer ?? 0)}
+        </p>
+        <p className="text-sm text-indigo-200">
+          سعرها الأصلي {money(price)} • الإيجار {money(p?.rent ?? 0)}
+        </p>
+        {iOwn ? (
+          <div className="grid gap-2 sm:grid-cols-2">
+            <button onClick={() => onReply(true)} disabled={busy} className="btn-primary">
+              ✅ موافق، بِعها بـ {money(p?.offer ?? 0)}
+            </button>
+            <button onClick={() => onReply(false)} disabled={busy} className="btn-ghost">
+              ❌ أرفض
+            </button>
+          </div>
+        ) : (
+          <p className="text-sm text-indigo-200">⏳ بانتظار رد {name(p?.owner)}...</p>
+        )}
+      </div>
+    );
+  }
+
+  if (b.phase === "notice") {
+    return <Notice b={b} me={me} name={name} canAck={myTurn || isHost} busy={busy} onAck={onAck} />;
+  }
+
+  if (b.phase === "auction" && p?.auction) {
+    return <AuctionPanel b={b} me={me} name={name} busy={busy} onBid={onBid} />;
   }
 
   if ((b.phase === "question" || b.phase === "reveal") && room.question) {
@@ -374,6 +490,306 @@ function TurnPanel({
   }
 
   return null;
+}
+
+// ---------- الشراء من المالك ----------
+
+/** عرض شراء: يبدأ بسعر المدينة + 50، ويمكن كتابة أي مبلغ */
+function OfferForm({
+  suggested,
+  cash,
+  left,
+  busy,
+  onOffer,
+}: {
+  suggested: number;
+  cash: number;
+  left: number;
+  busy: boolean;
+  onOffer: (amount: number) => void;
+}) {
+  const [amount, setAmount] = useState(String(Math.min(suggested, cash)));
+  const value = Number(amount);
+  const valid = Number.isInteger(value) && value >= 1 && value <= cash;
+  if (left <= 0) return <p className="text-xs text-indigo-300">استنفدت عروض الشراء (3) في هذه الوقفة</p>;
+  return (
+    <form
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (valid) onOffer(value);
+      }}
+      className="flex flex-wrap items-center gap-2 rounded-2xl bg-amber-400/10 p-3"
+    >
+      <span className="text-sm font-bold text-amber-200">🤝 اعرض شراءها بـ</span>
+      <input
+        type="number"
+        inputMode="numeric"
+        min={1}
+        max={cash}
+        value={amount}
+        onChange={(e) => setAmount(e.target.value)}
+        className="input w-28 text-center"
+        dir="ltr"
+      />
+      <button disabled={busy || !valid} className="btn-ghost">
+        إرسال العرض
+      </button>
+      <span className="w-full text-xs text-indigo-300">
+        المالك يوافق أو يرفض • باقي {left} {left === 1 ? "عرض" : "عروض"} • رصيدك {money(cash)}
+      </span>
+    </form>
+  );
+}
+
+// ---------- بطاقة "علم": ما حدث في الدور وكيف تغيّرت النقود ----------
+
+function Notice({
+  b,
+  me,
+  name,
+  canAck,
+  busy,
+  onAck,
+}: {
+  b: BankState;
+  me: number;
+  name: (i: number | undefined) => string;
+  canAck: boolean;
+  busy: boolean;
+  onAck: () => void;
+}) {
+  const p = b.pending;
+  const events = (p?.events ?? []).filter((e) => e.type !== "roll");
+  const before = p?.before ?? [];
+  const after = p?.after ?? [];
+  const changes = (b.players ?? [])
+    .map((_, i) => ({ i, diff: (after[i] ?? 0) - (before[i] ?? 0) }))
+    .filter((c) => c.diff !== 0);
+  return (
+    <div className="animate-pop space-y-3 rounded-3xl border-2 border-amber-300/60 bg-gradient-to-b from-amber-400/20 to-transparent p-4">
+      <p className="text-xl font-black text-amber-200">📢 ماذا حدث في دور {name(b.turn)}؟</p>
+      <ul className="space-y-2">
+        {events.map((e, k) => (
+          <li key={k} className="rounded-2xl bg-black/25 px-3 py-2.5 text-base font-bold leading-relaxed">
+            {describe(e, name)}
+          </li>
+        ))}
+      </ul>
+      {changes.length > 0 && (
+        <div className="space-y-1.5">
+          <p className="text-sm text-indigo-200">💵 النقود</p>
+          {changes.map(({ i, diff }) => (
+            <div
+              key={i}
+              className={`flex items-center justify-between rounded-xl px-3 py-2 ${
+                i === me ? "bg-white/15 ring-1 ring-white/30" : "bg-white/5"
+              }`}
+            >
+              <span className="flex items-center gap-2 font-bold">
+                <CarIcon shape={carOf(b, i).shape} color={carOf(b, i).color} size={14} />
+                {name(i)}
+              </span>
+              <span dir="ltr" className="text-sm">
+                {money(before[i] ?? 0)} →{" "}
+                <b className={diff > 0 ? "text-emerald-300" : "text-rose-300"}>
+                  {money(after[i] ?? 0)} ({diff > 0 ? "+" : "−"}
+                  {Math.abs(diff)})
+                </b>
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+      {canAck ? (
+        <button onClick={onAck} disabled={busy} className="btn-primary w-full py-3 text-lg">
+          👍 علم
+        </button>
+      ) : (
+        <p className="text-sm text-indigo-200">⏳ بانتظار {name(b.turn)} ليضغط علم</p>
+      )}
+    </div>
+  );
+}
+
+// ---------- المزاد ----------
+
+/** صاحب الدور يعرض مدينة أو مبنى في مزاد (قبل رمي الزهر) */
+function AuctionStart({
+  b,
+  me,
+  busy,
+  onStart,
+}: {
+  b: BankState;
+  me: number;
+  busy: boolean;
+  onStart: (sq: number, what: "city" | "building", min: number) => void;
+}) {
+  const props = b.props ?? [];
+  const options = BANK_BOARD.flatMap((s, sq) => {
+    if (s.t !== "city" || props[sq]?.o !== me) return [];
+    const out: { key: string; sq: number; what: "city" | "building"; label: string; base: number }[] = [
+      {
+        key: `c${sq}`,
+        sq,
+        what: "city",
+        label: `🏙️ ${s.n}${props[sq].lv ? ` (مع ${buildingOf(props[sq].lv)?.name})` : ""}`,
+        base: s.p,
+      },
+    ];
+    const bld = buildingOf(props[sq].lv);
+    if (bld)
+      out.push({
+        key: `b${sq}`,
+        sq,
+        what: "building",
+        label: `${bld.icon} ${bld.name} من ${s.n}`,
+        base: buildCost(s.p, bld.level),
+      });
+    return out;
+  });
+  const [open, setOpen] = useState(false);
+  const [choice, setChoice] = useState(options[0]?.key ?? "");
+  const [min, setMin] = useState("");
+  if (options.length === 0) return null;
+  const opt = options.find((o) => o.key === choice) ?? options[0];
+  const minValue = Number(min || opt.base);
+  return (
+    <div className="rounded-2xl bg-indigo-500/10 p-3 text-start">
+      <button type="button" onClick={() => setOpen((o) => !o)} className="text-sm font-bold text-indigo-100">
+        🔨 اعرض شيئاً في مزاد {open ? "▲" : "▼"}
+      </button>
+      {open && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (minValue >= 1) onStart(opt.sq, opt.what, minValue);
+          }}
+          className="mt-2 flex flex-wrap items-center gap-2"
+        >
+          <select
+            value={opt.key}
+            onChange={(e) => {
+              setChoice(e.target.value);
+              setMin("");
+            }}
+            className="min-w-0 flex-1 rounded-xl border border-white/15 bg-black/40 px-2 py-2 text-sm"
+          >
+            {options.map((o) => (
+              <option key={o.key} value={o.key}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <input
+            type="number"
+            inputMode="numeric"
+            min={1}
+            placeholder={String(opt.base)}
+            value={min}
+            onChange={(e) => setMin(e.target.value)}
+            className="input w-24 text-center"
+            dir="ltr"
+            title="أقل سعر تقبله"
+          />
+          <button disabled={busy || !(minValue >= 1)} className="btn-ghost">
+            ابدأ المزاد
+          </button>
+          <span className="w-full text-xs text-indigo-300">
+            اكتب أقل سعر تقبله. يزايد الباقون، والأعلى يأخذه. المبنى ينتقل لمدينة مؤهلة عند المشتري.
+          </span>
+        </form>
+      )}
+    </div>
+  );
+}
+
+function AuctionPanel({
+  b,
+  me,
+  name,
+  busy,
+  onBid,
+}: {
+  b: BankState;
+  me: number;
+  name: (i: number | undefined) => string;
+  busy: boolean;
+  onBid: (amount: number) => void;
+}) {
+  const a = b.pending!.auction!;
+  const props = b.props ?? [];
+  const s = BANK_BOARD[a.sq];
+  const cityName = s.t === "city" ? s.n : "";
+  const bld = buildingOf(a.level);
+  const item =
+    a.what === "city"
+      ? `🏙️ ${cityName}${bld ? ` (مع ${bld.icon} ${bld.name})` : ""}`
+      : `${bld?.icon} ${bld?.name} من ${cityName}`;
+  const floor = a.bid != null ? a.bid + 1 : a.min;
+  const myCash = b.cash?.[me] ?? 0;
+  const seller = me === a.seller;
+  const canBid = me >= 0 && !seller && !b.out?.[me];
+  const eligible = a.what === "city" || auctionTarget(props, me, a.level) != null;
+  const [amount, setAmount] = useState("");
+  const value = Number(amount || floor);
+  return (
+    <div className="space-y-3">
+      <p className="text-lg font-black">🔨 مزاد {name(a.seller)}</p>
+      <p className="rounded-2xl bg-white/10 px-3 py-2 text-xl font-black">{item}</p>
+      <p className="text-sm text-indigo-200">
+        {a.bid != null ? (
+          <>
+            أعلى مزايدة: <b className="text-amber-300">{money(a.bid)}</b> من {name(a.bidder ?? undefined)}
+          </>
+        ) : (
+          <>السعر الأدنى {money(a.min)} • لا مزايدات بعد</>
+        )}
+      </p>
+      {canBid &&
+        (eligible ? (
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (value >= floor && value <= myCash) {
+                onBid(value);
+                setAmount("");
+              }
+            }}
+            className="flex flex-wrap items-center justify-center gap-2"
+          >
+            {[0, 10, 50].map((inc) => (
+              <button
+                key={inc}
+                type="button"
+                disabled={busy || floor + inc > myCash}
+                onClick={() => onBid(floor + inc)}
+                className="btn-ghost"
+              >
+                {money(floor + inc)}
+              </button>
+            ))}
+            <input
+              type="number"
+              inputMode="numeric"
+              min={floor}
+              max={myCash}
+              placeholder={String(floor)}
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              className="input w-24 text-center"
+              dir="ltr"
+            />
+            <button disabled={busy || !(value >= floor && value <= myCash)} className="btn-primary">
+              زايد
+            </button>
+          </form>
+        ) : (
+          <p className="text-sm text-amber-200">لا تملك مدينة مؤهلة لهذا المبنى (مجموعة كاملة ومستوى أقل)</p>
+        ))}
+      {seller && <p className="text-sm text-indigo-200">⏳ المزاد جارٍ، كل مزايدة تمدد الوقت 10 ثوانٍ</p>}
+    </div>
+  );
 }
 
 /** زهر واحد */
@@ -447,13 +863,18 @@ function Board({
   props,
   order,
   name,
+  onPick,
 }: {
   b: BankState;
   props: BankProp[];
   order: string[];
   name: (i: number | undefined) => string;
+  /** مرحلة التحريك وصاحب الدور أنا: المربعات قابلة للضغط (بدون كشف المربع الصحيح) */
+  onPick?: (sq: number) => void;
 }) {
   const pos = b.pos ?? [];
+  const moving = b.phase === "move";
+  const start = moving ? pos[b.turn ?? 0] : null;
   return (
     <div className="mx-auto w-full max-w-[560px] select-none" dir="ltr">
       <div className="grid aspect-square grid-cols-8 grid-rows-8 gap-0.5 rounded-2xl bg-emerald-950 p-1 shadow-2xl">
@@ -466,8 +887,11 @@ function Board({
             <div
               key={i}
               style={{ gridRow: row + 1, gridColumn: col + 1, borderColor: ownerColor }}
+              onClick={onPick ? () => onPick(i) : undefined}
               className={`relative flex flex-col overflow-hidden rounded-md bg-[#f5ecd7] text-slate-900 ${
                 pr?.o != null ? "border-[3px]" : "border border-black/10"
+              } ${onPick ? "cursor-pointer transition hover:z-10 hover:scale-110 hover:shadow-xl hover:ring-4 hover:ring-amber-400" : ""} ${
+                start === i ? "ring-4 ring-amber-300" : ""
               }`}
               title={squareTitle(s, i, props, name)}
             >
@@ -575,9 +999,10 @@ function describe(e: BankEvent, name: (i: number | undefined) => string): string
   const city = e.sq != null ? squareName(e.sq) : "";
   switch (e.type) {
     case "roll":
-      return Array.isArray(e.dice)
-        ? `🎲 ${who} رمى ${e.dice[0]} و${e.dice[1]} ووصل إلى ${squareName(e.to ?? 0)}`
-        : `🎲 ${who} رمى ${e.dice} ووصل إلى ${squareName(e.to ?? 0)}`;
+      if (Array.isArray(e.dice)) return `🎲 ${who} رمى ${e.dice[0]} و${e.dice[1]} ووصل إلى ${squareName(e.to ?? 0)}`;
+      return e.to != null ? `🎲 ${who} رمى ${e.dice} ووصل إلى ${squareName(e.to)}` : `🎲 ${who} رمى ${e.dice}`;
+    case "moved":
+      return `🚗 ${who} حرّك سيارته ${e.dice} خطوات إلى ${squareName(e.to ?? 0)}`;
     case "pass_start":
       return `🏁 ${who} مرّ بالبداية (+${e.amount})`;
     case "buy":
@@ -618,6 +1043,24 @@ function describe(e: BankEvent, name: (i: number | undefined) => string): string
       return `💸 ${who} أفلس وعادت مدنه للبنك`;
     case "left":
       return `🚪 ${who} خرج من اللعبة وعادت مدنه للبنك`;
+    case "offer":
+      return `🤝 ${who} عرض على ${name(e.owner)} شراء ${city} بـ ${e.amount}`;
+    case "offer_rejected":
+      return `❌ ${name(e.owner)} رفض بيع ${city} لـ ${who} بـ ${e.amount}`;
+    case "trade":
+      return `🤝 ${who} اشترى ${city} من ${name(e.owner)} بـ ${e.amount}`;
+    case "auction": {
+      const bld = buildingOf(e.level ?? 0);
+      return `🔨 ${who} عرض في المزاد ${e.what === "building" ? `${bld?.icon} ${bld?.name} من ${city}` : city} (أقل سعر ${e.amount})`;
+    }
+    case "auction_sold": {
+      const bld = buildingOf(e.level ?? 0);
+      return e.what === "building"
+        ? `🔨 ${name(e.owner)} اشترى ${bld?.icon} ${bld?.name} من ${who} بـ ${e.amount}، ونقله إلى ${squareName(e.to_sq ?? 0)}`
+        : `🔨 ${name(e.owner)} اشترى ${city} من ${who} في المزاد بـ ${e.amount}`;
+    }
+    case "auction_none":
+      return `🔨 لم يزايد أحد على ما عرضه ${who}`;
   }
 }
 
