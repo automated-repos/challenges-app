@@ -18,6 +18,7 @@ import type { DominoResult } from "@/lib/domino";
 import { DominoTile } from "./DominoGame";
 import { rankTeams, teamInfo, type TeamStanding } from "@/lib/teams";
 import { Avatar } from "../ui";
+import { RAID_TEAMS, RAID_WIN_BONUS, type RaidResult as RaidResultData } from "@/lib/raid/state";
 
 const MEDALS = ["🥇", "🥈", "🥉"];
 
@@ -32,6 +33,7 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
   const c4 = room.game === "connect4" && room.c4?.sides ? room.c4 : null;
   const snakes = room.game === "snakes" && room.snakes?.sides ? room.snakes : null;
   const domino = room.game === "domino" && room.domino?.result ? room.domino.result : null;
+  const raid = room.game === "raid" && room.raid?.result ? room.raid.result : null;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -46,7 +48,9 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
         )}
       </section>
 
-      {c4 ? (
+      {raid ? (
+        <RaidResult result={raid} players={players} userId={userId} />
+      ) : c4 ? (
         <C4Result c4={c4} players={players} userId={userId} />
       ) : bank ? (
         <BankResult bank={bank} players={players} userId={userId} />
@@ -67,7 +71,7 @@ export function Results({ players, userId, room }: { players: Player[]; userId: 
         </>
       )}
 
-      {(teams.length > 0 || ludo || domino || snakes || chess || pirate || bank || c4) && (
+      {(teams.length > 0 || raid || ludo || domino || snakes || chess || pirate || bank || c4) && (
         <h2 className="pt-2 text-center font-bold text-indigo-200">ترتيب اللاعبين بالنقاط</h2>
       )}
 
@@ -483,6 +487,65 @@ function DominoPlaces({ result, players, userId }: { result: DominoResult; playe
           );
         })}
       </ol>
+    </section>
+  );
+}
+
+function RaidResult({ result, players, userId }: { result: RaidResultData; players: Player[]; userId: string }) {
+  const name = (id: string) => players.find((p) => p.user_id === id);
+  const rows = Object.entries(result.stats).sort((a, b) => b[1].g - a[1].g || b[1].k - a[1].k);
+  return (
+    <section className="space-y-4">
+      {result.reason === "host_left" ? (
+        <p className="rounded-2xl bg-amber-400/15 p-4 text-center text-amber-100">
+          📡 انقطع منشئ الغرفة قبل حساب النتيجة، فانتهت اللعبة بلا نقاط
+        </p>
+      ) : (
+        <p className="text-center text-2xl font-black">
+          {result.winner === 0
+            ? "🤝 تعادل!"
+            : `🏆 فاز ${RAID_TEAMS[result.winner].name} ${RAID_TEAMS[result.winner].emoji}`}
+        </p>
+      )}
+      <div className="grid grid-cols-2 gap-3">
+        {([1, 2] as const).map((t) => (
+          <div
+            key={t}
+            className={`rounded-2xl border p-4 text-center ${
+              result.winner === t ? "border-amber-300/60 bg-amber-400/15" : "border-white/10 bg-white/5"
+            }`}
+          >
+            <div className="text-3xl">{RAID_TEAMS[t].emoji}</div>
+            <div className={`font-bold ${RAID_TEAMS[t].text}`}>{RAID_TEAMS[t].name}</div>
+            <div className="mt-1 text-3xl font-black">💰 {result.teams[t - 1]}</div>
+          </div>
+        ))}
+      </div>
+      <ul className="space-y-1.5">
+        {rows.map(([id, st]) => {
+          const p = name(id);
+          return (
+            <li
+              key={id}
+              className={`flex items-center gap-3 rounded-xl px-4 py-2 ${
+                id === userId ? "bg-indigo-500/25 ring-1 ring-indigo-400" : "bg-white/5"
+              }`}
+            >
+              <span>{RAID_TEAMS[st.team].emoji}</span>
+              {p && <Avatar emoji={p.avatar} size="sm" />}
+              <span className="flex-1 truncate font-bold">{p?.name ?? "لاعب غادر"}</span>
+              <span className="text-sm text-indigo-200">
+                💰 {st.g} • 🏹 {st.k} • 💀 {st.d}
+              </span>
+            </li>
+          );
+        })}
+      </ul>
+      {result.reason === "time" && (
+        <p className="text-center text-xs text-indigo-300">
+          النقاط: عُشر الذهب المودَع، و+{RAID_WIN_BONUS} لكل لاعب في الفريق الفائز
+        </p>
+      )}
     </section>
   );
 }

@@ -1,6 +1,7 @@
 import type { SnakesState } from "./snakes";
 import type { DominoState } from "./domino";
 import type { Car } from "./bankBoard";
+import type { RaidState } from "./raid/state";
 
 export type RoomStatus =
   | "lobby"
@@ -56,7 +57,7 @@ export interface Room {
   /** عدد الفرق في وضع الفرق */
   team_count: number | null;
   /** نوع اللعبة: مسابقة أسئلة أو أتوبيس كومبليت أو لودو */
-  game: "quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy" | "bank" | "snakes" | "connect4" | "domino";
+  game: "quiz" | "stop" | "ludo" | "chess" | "pirate" | "spy" | "bank" | "snakes" | "connect4" | "domino" | "raid";
   /** حالة لودو (انظر 0016_ludo_quiz.sql) */
   ludo: LudoState | null;
   /** حالة الشطرنج (انظر 0019_chess.sql) */
@@ -73,6 +74,8 @@ export interface Room {
   snakes: SnakesState | null;
   /** حالة الدومينو العامة (انظر 0029_domino.sql). يد كل لاعب لا تُرسل هنا */
   domino: DominoState | null;
+  /** حالة قرية روبن هود (انظر 0035_raid.sql). الحركة نفسها لا تمر بالقاعدة */
+  raid?: RaidState | null;
   /** أتوبيس كومبليت: الخانات وحرف الجولة */
   stop_categories: string[] | null;
   stop_letter: string | null;

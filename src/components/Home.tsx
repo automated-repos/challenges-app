@@ -151,7 +151,7 @@ function useAfterCreate() {
 /** اختيار نوع اللعبة ثم إعداداتها */
 function CreateTab() {
   const [game, setGame] = useState<
-    "quiz" | "stop" | "ludo" | "snakes" | "chess" | "pirate" | "spy" | "bank" | "connect4" | "domino"
+    "quiz" | "stop" | "ludo" | "snakes" | "chess" | "pirate" | "spy" | "bank" | "connect4" | "domino" | "raid"
   >("quiz");
   return (
     <div className="space-y-5">
@@ -168,6 +168,7 @@ function CreateTab() {
             { id: "bank", icon: "🏙️", name: "إمبراطورية المدن" },
             { id: "connect4", icon: "🔴", name: "أربعة على التوالي" },
             { id: "domino", icon: "🁫", name: "دومينو" },
+            { id: "raid", icon: "🏹", name: "قرية روبن هود" },
           ] as const
         ).map((g) => (
           <button
@@ -195,6 +196,8 @@ function CreateTab() {
         <SnakesForm />
       ) : game === "domino" ? (
         <DominoForm />
+      ) : game === "raid" ? (
+        <RaidForm />
       ) : game === "chess" ? (
         <ChessForm />
       ) : game === "pirate" ? (
@@ -290,6 +293,55 @@ function LudoForm() {
       </div>
       {error && <ErrorBox>{error}</ErrorBox>}
       <button disabled={busy || !categories} className="btn-primary w-full">
+        {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
+      </button>
+    </form>
+  );
+}
+
+function RaidForm() {
+  const afterCreate = useAfterCreate();
+  const [minutes, setMinutes] = useState(3);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  async function submit(e: React.FormEvent) {
+    e.preventDefault();
+    setBusy(true);
+    setError("");
+    try {
+      const { data, error } = await getSupabase().rpc("create_raid_room", { p_minutes: minutes });
+      if (error) throw error;
+      await afterCreate(data as string);
+    } catch (err) {
+      setError(errorMessage(err));
+      setBusy(false);
+    }
+  }
+
+  return (
+    <form onSubmit={submit} className="space-y-5">
+      <p className="rounded-2xl bg-white/5 p-3 text-sm text-indigo-200">
+        لعبة حركية: من 2 إلى 8 لاعبين في فريقين، رجال الغابة 🏹 ضد حرس الشريف 🛡️. تحرّك في القرية، اجمع الذهب من
+        الصناديق وأوصله لمعسكرك، وارمِ السهام على الخصوم: من يسقط يُسقط ذهبه المحمول. الفريق الأكثر ذهباً في معسكره عند
+        انتهاء الوقت يفوز.
+        <br />
+        على الكمبيوتر: الأسهم أو WASD والفأرة. على الجوال: عصا تحكم وزر رمي.
+        <br />
+        النقاط: عُشر ذهبك المودَع، و+20 لكل لاعب في الفريق الفائز.
+      </p>
+      <Field label={`مدة الجولة: ${minutes} دقائق`}>
+        <input
+          type="range"
+          min={2}
+          max={10}
+          value={minutes}
+          onChange={(e) => setMinutes(Number(e.target.value))}
+          className="w-full accent-amber-400"
+        />
+      </Field>
+      {error && <ErrorBox>{error}</ErrorBox>}
+      <button disabled={busy} className="btn-primary w-full">
         {busy ? "جارٍ الإنشاء..." : "إنشاء الغرفة"}
       </button>
     </form>

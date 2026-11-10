@@ -9,6 +9,9 @@ type Phase = "loading" | "need-join" | "ready" | "error";
 /** من ينقطع اتصاله أطول من هذا يُخرج من الغرفة (تكفي لتحديث الصفحة أو تقطع قصير) */
 const DISCONNECT_GRACE_MS = 10_000;
 
+/** قرية روبن هود: إن لم يُنهِ منشئ الغرفة اللعبة بعد انتهاء وقتها بهذه المدة تُنهى بلا نقاط (انظر 0035_raid.sql) */
+const RAID_HOST_GRACE_MS = 25_000;
+
 export function useRoom(code: string, userId: string) {
   const [phase, setPhase] = useState<Phase>("loading");
   const [error, setError] = useState("");
@@ -206,6 +209,11 @@ function newer(prev: Room | null, next: Room): Room {
 }
 
 export function currentDeadline(room: Room): number | null {
+  if (room.game === "raid") {
+    // منشئ الغرفة يُنهي اللعبة بنفسه؛ هذا احتياط إن انقطع (نفس مهلة القاعدة)
+    if (room.status !== "playing" || !room.raid?.ends_at) return null;
+    return Date.parse(room.raid.ends_at) + RAID_HOST_GRACE_MS;
+  }
   if (room.game === "domino") {
     if (room.status !== "playing" || !room.question_deadline) return null;
     // ثانية سماح للإجابة (نفس القاعدة)

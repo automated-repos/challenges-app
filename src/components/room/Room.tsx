@@ -24,6 +24,7 @@ import { PirateGame } from "./PirateGame";
 import { SpyGame } from "./SpyGame";
 import { BankGame } from "./BankGame";
 import { Connect4Game } from "./Connect4Game";
+import { RaidGame } from "./RaidGame";
 import { Results } from "./Results";
 import { Scoreboard } from "./Scoreboard";
 import { VoiceChat } from "./VoiceChat";
@@ -137,6 +138,10 @@ function RoomInner({ code, userId, profile }: { code: string; userId: string; pr
             />
             <Scoreboard players={players} userId={userId} room={room} call={call} />
           </div>
+        )}
+
+        {room.status === "playing" && room.game === "raid" && room.raid?.players && (
+          <RaidGame room={room} players={players} userId={userId} isHost={isHost} offset={offset} call={call} />
         )}
 
         {room.status === "playing" && room.game === "connect4" && room.c4 && (

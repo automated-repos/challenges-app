@@ -132,7 +132,11 @@ export function Lobby({
   // الدومينو من 2 إلى 4 لاعبين (نفس شرط القاعدة)
   const dominoBlock =
     room.game === "domino" && players.length > 4 ? `الدومينو حتى 4 لاعبين، وفي الغرفة ${players.length}` : "";
-  const canStart = !alone && !tooMany && !chessBlock && !c4Block && !spyBlock && !dominoBlock && allReady && !teamBlock;
+  // قرية روبن هود حتى 8 لاعبين (نفس شرط القاعدة)
+  const raidBlock =
+    room.game === "raid" && players.length > 8 ? `قرية روبن هود حتى 8 لاعبين، وفي الغرفة ${players.length}` : "";
+  const canStart =
+    !alone && !tooMany && !chessBlock && !c4Block && !spyBlock && !dominoBlock && !raidBlock && allReady && !teamBlock;
 
   return (
     <div className="mx-auto max-w-2xl space-y-6">
@@ -156,7 +160,14 @@ export function Lobby({
           </Link>
         )}
         <div className="mt-5 flex flex-wrap justify-center gap-x-6 gap-y-1 text-sm text-indigo-200">
-          {room.game === "domino" ? (
+          {room.game === "raid" ? (
+            <>
+              <span>🏹 قرية روبن هود</span>
+              <span>{room.raid?.minutes ?? 3} دقائق</span>
+              <span>2 إلى 8 لاعبين • فريقان يُوزَّعان عشوائياً</span>
+              <span>🖥️ أبقِ الصفحة مفتوحة يا منشئ الغرفة: جهازك هو الحَكَم</span>
+            </>
+          ) : room.game === "domino" ? (
             <>
               <span>🁫 دومينو كلاسيكي</span>
               <span>2 إلى 4 لاعبين • 7 قطع لكل لاعب</span>
@@ -267,9 +278,12 @@ export function Lobby({
 
       {room.game === "bank" && <CarPicker room={room} players={players} userId={userId} call={call} />}
 
-      {isHost && room.game !== "stop" && room.game !== "spy" && room.game !== "bank" && room.game !== "domino" && (
-        <TeamSettings room={room} busy={busy} run={run} />
-      )}
+      {isHost &&
+        room.game !== "stop" &&
+        room.game !== "spy" &&
+        room.game !== "bank" &&
+        room.game !== "domino" &&
+        room.game !== "raid" && <TeamSettings room={room} busy={busy} run={run} />}
 
       {teamMode ? (
         <LobbyTeams room={room} players={players} userId={userId} busy={busy} run={run} />
@@ -340,6 +354,7 @@ export function Lobby({
           {teamBlock && <p className="text-center text-sm text-amber-200">👥 {teamBlock}</p>}
           {chessBlock && <p className="text-center text-sm text-amber-200">♟️ {chessBlock}</p>}
           {c4Block && <p className="text-center text-sm text-amber-200">🔴 {c4Block}</p>}
+          {raidBlock && <p className="text-center text-sm text-amber-200">🏹 {raidBlock}</p>}
           {dominoBlock && <p className="text-center text-sm text-amber-200">🁫 {dominoBlock}</p>}
           {spyBlock && !alone && <p className="text-center text-sm text-amber-200">🕵️ {spyBlock}</p>}
         </div>
