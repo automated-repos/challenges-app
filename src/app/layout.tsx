@@ -15,7 +15,11 @@ export const metadata: Metadata = {
   description: "مسابقة أسئلة عامة جماعية مع الأصدقاء",
   // للتثبيت على آيفون (أيقونة الشاشة الرئيسية وفتح التطبيق بملء الشاشة)
   appleWebApp: { capable: true, title: "تحدي الأسئلة", statusBarStyle: "black-translucent" },
-  icons: { apple: `${base}/apple-touch-icon.png`, icon: `${base}/icon-192.png` },
+  icons: {
+    apple: `${base}/apple-touch-icon.png`,
+    // أيقونة التبويب: كأس
+    icon: [{ url: `${base}/icon.svg`, type: "image/svg+xml" }],
+  },
 };
 
 export const viewport: Viewport = {
