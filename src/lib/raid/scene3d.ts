@@ -31,10 +31,25 @@ export interface SceneView {
   /** نقطة تتبعها الكاميرا (بالبكسل) */
   focus: { x: number; y: number };
   spectator: boolean;
+  /** إعدادات الكاميرا: القرب (1 = الافتراضي)، والميل بالدرجات (90 = من فوق مباشرة)، والدوران بالدرجات */
+  camera: CameraSettings;
   /** الوقت بالميلي ثانية (للحركات) */
   tf: number;
   dt: number;
 }
+
+export interface CameraSettings {
+  zoom: number;
+  pitch: number;
+  yaw: number;
+}
+
+export const CAMERA_DEFAULT: CameraSettings = { zoom: 1, pitch: 55, yaw: 0 };
+export const CAMERA_LIMITS = { zoom: [0.45, 2.6], pitch: [25, 88] } as const;
+
+/** المسافة بين الكاميرا واللاعب عند القرب الافتراضي */
+const BASE_DIST = 16;
+const SPECTATOR_DIST = 36;
 
 function rand(c: number, r: number, k = 0) {
   const s = Math.sin(c * 127.1 + r * 311.7 + k * 74.7) * 43758.5453;
@@ -181,6 +196,8 @@ export class RaidScene {
   private scene = new THREE.Scene();
   private camera = new THREE.PerspectiveCamera(42, 1, 0.5, 200);
   private camTarget = new THREE.Vector3(MAP_W / 2, 0, MAP_H / 2);
+  /** الإعدادات الحالية (تقترب بنعومة من المطلوبة) */
+  private cam = { ...CAMERA_DEFAULT };
   private heroes = new Map<string, HeroModel>();
   private arrows = new Map<number, THREE.Group>();
   private drops = new Map<number, THREE.Group>();
@@ -203,7 +220,7 @@ export class RaidScene {
 
     const sky = new THREE.Color("#9fd3f0");
     this.scene.background = sky;
-    this.scene.fog = new THREE.Fog(sky, 28, 70);
+    this.scene.fog = new THREE.Fog(sky, 45, 130);
 
     // الإضاءة: سماء + شمس بظلال
     this.scene.add(new THREE.HemisphereLight("#dff2ff", "#3d5c2a", 1.4));
@@ -538,6 +555,11 @@ export class RaidScene {
     }
   }
 
+  /** دوران الكاميرا الحالي (راديان): الحركة بالأسهم تكون بالنسبة له */
+  get yaw() {
+    return THREE.MathUtils.degToRad(this.cam.yaw);
+  }
+
   resize(w: number, h: number, dpr: number) {
     this.w = w;
     this.h = h;
@@ -576,7 +598,18 @@ export class RaidScene {
         );
     if (this.camTarget.distanceTo(target) > 12) this.camTarget.copy(target);
     else this.camTarget.lerp(target, k);
-    const off = v.spectator ? new THREE.Vector3(0, 30, 17) : new THREE.Vector3(0, 10.5 * tight, 7.2 * tight);
+    const c = this.cam;
+    c.zoom += (v.camera.zoom - c.zoom) * k;
+    c.pitch += (v.camera.pitch - c.pitch) * k;
+    c.yaw += (v.camera.yaw - c.yaw) * k;
+    const dist = (v.spectator ? SPECTATOR_DIST : BASE_DIST * tight) * c.zoom;
+    const pitch = THREE.MathUtils.degToRad(c.pitch);
+    const yaw = THREE.MathUtils.degToRad(c.yaw);
+    const off = new THREE.Vector3(
+      dist * Math.cos(pitch) * Math.sin(yaw),
+      dist * Math.sin(pitch),
+      dist * Math.cos(pitch) * Math.cos(yaw),
+    );
     this.camera.position.copy(this.camTarget).add(off);
     this.camera.lookAt(this.camTarget);
 

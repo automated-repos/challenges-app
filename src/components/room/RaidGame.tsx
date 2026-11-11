@@ -26,7 +26,7 @@ import { openRaidNet } from "@/lib/raid/net";
 import { RAID_TEAMS } from "@/lib/raid/state";
 import { drawArrow, drawChest, drawDrop, drawHero, hexAlpha, label, renderBackground } from "@/lib/raid/draw";
 import { ErrorBox } from "../ui";
-import type { RaidScene } from "@/lib/raid/scene3d";
+import type { CameraSettings, RaidScene } from "@/lib/raid/scene3d";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -50,6 +50,35 @@ const KEYS: Record<string, "up" | "down" | "left" | "right" | "fire"> = {
   Space: "fire",
   KeyJ: "fire",
 };
+
+// نفس القيم في scene3d.ts (لا نستوردها حتى لا تُحمّل Three.js مع الصفحة)
+const CAM_DEFAULT: CameraSettings = { zoom: 1, pitch: 55, yaw: 0 };
+const CAM_KEY = "raid-camera";
+
+function loadCamera(): CameraSettings {
+  try {
+    const c = JSON.parse(localStorage.getItem(CAM_KEY) ?? "null") as CameraSettings | null;
+    if (c && [c.zoom, c.pitch, c.yaw].every(Number.isFinite)) return c;
+  } catch {
+    // التخزين غير متاح: نستخدم الافتراضي
+  }
+  return { ...CAM_DEFAULT };
+}
+
+/** يعدّل الكاميرا ضمن الحدود ويحفظها لهذا المتصفح */
+function adjustCamera(c: CameraSettings, d: { zoom?: number; pitch?: number; yaw?: number } | "reset") {
+  if (d === "reset") Object.assign(c, CAM_DEFAULT, { yaw: Math.round(c.yaw / 360) * 360 });
+  else {
+    if (d.zoom) c.zoom = Math.min(2.6, Math.max(0.45, c.zoom * d.zoom));
+    if (d.pitch) c.pitch = Math.min(88, Math.max(25, c.pitch + d.pitch));
+    if (d.yaw) c.yaw += d.yaw;
+  }
+  try {
+    localStorage.setItem(CAM_KEY, JSON.stringify(c));
+  } catch {
+    // لا بأس
+  }
+}
 
 interface Controls {
   /** عصا اللمس (-1..1) */
@@ -87,6 +116,9 @@ export function RaidGame({
   const ctlRef = useRef<Controls>({ jx: 0, jy: 0, fire: false });
   const namesRef = useRef(new Map<string, string>());
   const callRef = useRef(call);
+  const [camInit] = useState(loadCamera);
+  const camRef = useRef<CameraSettings>(camInit);
+  const [camOpen, setCamOpen] = useState(false);
   const [error, setError] = useState("");
   const [touch] = useState(() => typeof window !== "undefined" && window.matchMedia("(pointer: coarse)").matches);
   const [canFullscreen] = useState(() => typeof document !== "undefined" && !!document.fullscreenEnabled);
@@ -229,6 +261,10 @@ export function RaidGame({
     const onKey = (e: KeyboardEvent, down: boolean) => {
       const el = e.target as HTMLElement | null;
       if (el && (el.tagName === "INPUT" || el.tagName === "TEXTAREA" || el.isContentEditable)) return;
+      if (down && (e.code === "KeyQ" || e.code === "KeyE")) {
+        adjustCamera(camRef.current, { yaw: e.code === "KeyQ" ? -45 : 45 });
+        return;
+      }
       const k = KEYS[e.code];
       if (!k) return;
       e.preventDefault();
@@ -262,6 +298,11 @@ export function RaidGame({
     window.addEventListener("blur", onBlur);
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerdown", onDown);
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
+      adjustCamera(camRef.current, { zoom: Math.exp(e.deltaY * 0.0012) });
+    };
+    canvas.addEventListener("wheel", onWheel, { passive: false });
 
     // ---------- المشهد ثلاثي الأبعاد (يُحمّل عند الحاجة، والرسم المسطح احتياط إن لم يدعم الجهاز WebGL) ----------
     let scene: RaidScene | null = null;
@@ -342,6 +383,9 @@ export function RaidGame({
         mx /= len;
         my /= len;
       }
+      // "للأعلى" = بعيداً عن الكاميرا مهما دارت
+      const yaw = scene?.yaw ?? 0;
+      [mx, my] = [mx * Math.cos(yaw) + my * Math.sin(yaw), -mx * Math.sin(yaw) + my * Math.cos(yaw)];
       if (alive && len > 0.1) {
         const sp = speedFor(mine?.c ?? 0);
         [me.x, me.y] = moveCircle(me.x, me.y, mx * sp * dt, my * sp * dt, HERO_RADIUS);
@@ -443,6 +487,7 @@ export function RaidGame({
           drops: s?.dr ?? [],
           focus: me,
           spectator: team === null,
+          camera: camRef.current,
           tf,
           dt,
         });
@@ -605,6 +650,7 @@ export function RaidGame({
       document.removeEventListener("fullscreenchange", resize);
       canvas.removeEventListener("pointermove", onMove);
       canvas.removeEventListener("pointerdown", onDown);
+      canvas.removeEventListener("wheel", onWheel);
     };
   }, [room.id, isHost, userId, rosterJson, startAt, endAt, offset, touch]);
 
@@ -633,19 +679,21 @@ export function RaidGame({
       >
         <canvas ref={glRef} className="block w-full" />
         <canvas ref={canvasRef} className="absolute inset-0 block w-full touch-none" style={{ cursor: "crosshair" }} />
-        {canFullscreen && (
-          <button
-            type="button"
-            onClick={toggleFullscreen}
-            className="absolute bottom-2 right-2 rounded-lg bg-black/50 px-2 py-1 text-sm text-white hover:bg-black/70"
-            style={
-              touch ? { top: 44, bottom: "auto", left: "50%", right: "auto", transform: "translateX(-50%)" } : undefined
-            }
-            title="ملء الشاشة"
-          >
-            ⛶
-          </button>
-        )}
+        <div className="absolute left-1/2 top-11 flex max-w-[60%] -translate-x-1/2 flex-wrap items-center justify-center gap-1">
+          {canFullscreen && <CamButton label="ملء الشاشة" icon="⛶" onClick={toggleFullscreen} />}
+          <CamButton label="التحكم في الكاميرا" icon="🎥" active={camOpen} onClick={() => setCamOpen((v) => !v)} />
+          {camOpen && (
+            <>
+              <CamButton label="تقريب" icon="➕" onClick={() => adjustCamera(camRef.current, { zoom: 0.8 })} />
+              <CamButton label="إبعاد" icon="➖" onClick={() => adjustCamera(camRef.current, { zoom: 1.25 })} />
+              <CamButton label="من فوق أكثر" icon="⤒" onClick={() => adjustCamera(camRef.current, { pitch: 10 })} />
+              <CamButton label="من الجانب أكثر" icon="⤓" onClick={() => adjustCamera(camRef.current, { pitch: -10 })} />
+              <CamButton label="دوران لليسار" icon="⟲" onClick={() => adjustCamera(camRef.current, { yaw: -45 })} />
+              <CamButton label="دوران لليمين" icon="⟳" onClick={() => adjustCamera(camRef.current, { yaw: 45 })} />
+              <CamButton label="الوضع الافتراضي" icon="↺" onClick={() => adjustCamera(camRef.current, "reset")} />
+            </>
+          )}
+        </div>
         {touch && myTeam !== null && (
           <>
             <Joystick onChange={setStick} />
@@ -680,11 +728,40 @@ export function RaidGame({
         {touch ? (
           <span>العصا للحركة • 🏹 للرمي (يصوّب على أقرب خصم)</span>
         ) : (
-          <span>WASD أو الأسهم للحركة • الفأرة للتصويب والرمي • مسافة = رمي على أقرب خصم</span>
+          <span>
+            WASD أو الأسهم للحركة • الفأرة للتصويب والرمي • مسافة = رمي على أقرب خصم • عجلة الفأرة للتقريب و Q / E
+            للدوران
+          </span>
         )}
         <span>اجمع 💰 من الصناديق وأوصلها لمعسكرك</span>
       </div>
     </div>
+  );
+}
+
+function CamButton({
+  label,
+  icon,
+  onClick,
+  active = false,
+}: {
+  label: string;
+  icon: string;
+  onClick: () => void;
+  active?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onClick={onClick}
+      className={`flex h-8 w-8 items-center justify-center rounded-lg text-sm text-white transition ${
+        active ? "bg-amber-500/80 hover:bg-amber-500" : "bg-black/50 hover:bg-black/70"
+      }`}
+    >
+      {icon}
+    </button>
   );
 }
 
