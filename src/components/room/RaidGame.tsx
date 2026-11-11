@@ -26,6 +26,7 @@ import { openRaidNet } from "@/lib/raid/net";
 import { RAID_TEAMS } from "@/lib/raid/state";
 import { drawArrow, drawChest, drawDrop, drawHero, hexAlpha, label, renderBackground } from "@/lib/raid/draw";
 import { ErrorBox } from "../ui";
+import type { RaidScene } from "@/lib/raid/scene3d";
 
 type Call = (fn: string, args?: Record<string, unknown>) => Promise<unknown>;
 
@@ -81,6 +82,7 @@ export function RaidGame({
 
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const glRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<RaidEngine | null>(null);
   const ctlRef = useRef<Controls>({ jx: 0, jy: 0, fire: false });
   const namesRef = useRef(new Map<string, string>());
@@ -101,8 +103,9 @@ export function RaidGame({
 
   useEffect(() => {
     const canvas = canvasRef.current;
+    const gl = glRef.current;
     const wrap = wrapRef.current;
-    if (!canvas || !wrap || !startAt || !endAt) return;
+    if (!canvas || !gl || !wrap || !startAt || !endAt) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
@@ -260,6 +263,24 @@ export function RaidGame({
     canvas.addEventListener("pointermove", onMove);
     canvas.addEventListener("pointerdown", onDown);
 
+    // ---------- المشهد ثلاثي الأبعاد (يُحمّل عند الحاجة، والرسم المسطح احتياط إن لم يدعم الجهاز WebGL) ----------
+    let scene: RaidScene | null = null;
+    let flat = false;
+    let disposed = false;
+    import("@/lib/raid/scene3d")
+      .then(({ RaidScene }) => {
+        if (disposed) return;
+        try {
+          scene = new RaidScene(gl, touch);
+          resize();
+        } catch {
+          flat = true;
+        }
+      })
+      .catch(() => {
+        flat = true;
+      });
+
     // ---------- المقاس ----------
     let cssW = 0;
     let cssH = 0;
@@ -272,6 +293,8 @@ export function RaidGame({
       canvas.width = Math.round(cssW * dpr);
       canvas.height = Math.round(cssH * dpr);
       canvas.style.height = `${cssH}px`;
+      gl.style.height = `${cssH}px`;
+      scene?.resize(cssW, cssH, Math.min(dpr, touch ? 1.5 : 2));
     };
     resize();
     const ro = new ResizeObserver(resize);
@@ -327,7 +350,10 @@ export function RaidGame({
       // التصويب: الفأرة إن استُخدمت مؤخراً، وإلا أقرب خصم عند الرمي، وإلا اتجاه الحركة
       const firing = alive && (keys.has("fire") || mouse.down || ctl.fire);
       if (tf - mouse.at < 4000) {
-        me.a = Math.atan2(cam.y + mouse.y / cam.scale - me.y, cam.x + mouse.x / cam.scale - me.x);
+        const p = scene
+          ? scene.groundAt(mouse.x, mouse.y)
+          : { x: cam.x + mouse.x / cam.scale, y: cam.y + mouse.y / cam.scale };
+        if (p) me.a = Math.atan2(p.y - me.y, p.x - me.x);
       } else {
         const target = firing ? nearestEnemy() : null;
         if (target) me.a = Math.atan2(target.y - me.y, target.x - me.x);
@@ -369,33 +395,7 @@ export function RaidGame({
         if (arrowBlocked(a.x, a.y) || tf - a.born > ARROW_LIFE * 1000 + 150) a.dead = true;
       }
 
-      // الكاميرا
-      if (team !== null) {
-        const viewW = Math.min(WORLD_W, Math.max(480, Math.min(cssW, 820)));
-        cam.scale = cssW / viewW;
-      } else {
-        cam.scale = Math.min(cssW / WORLD_W, cssH / WORLD_H);
-      }
-      const vw = cssW / cam.scale;
-      const vh = cssH / cam.scale;
-      const fx = team !== null ? me.x : WORLD_W / 2;
-      const fy = team !== null ? me.y : WORLD_H / 2;
-      cam.x = vw >= WORLD_W ? (WORLD_W - vw) / 2 : Math.max(0, Math.min(WORLD_W - vw, fx - vw / 2));
-      cam.y = vh >= WORLD_H ? (WORLD_H - vh) / 2 : Math.max(0, Math.min(WORLD_H - vh, fy - vh / 2));
-
-      // ---------- الرسم ----------
-      ctx.setTransform(1, 0, 0, 1, 0, 0);
-      ctx.fillStyle = "#14250f";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-      const z = dpr * cam.scale;
-      ctx.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z);
-      ctx.drawImage(bg, 0, 0);
-
-      CHESTS.forEach((c, i) => drawChest(ctx, c.x, c.y, c.value, s ? s.ch[i] === 1 : true));
-      if (s) for (const d of s.dr) drawDrop(ctx, d.x, d.y, d.v, font);
-      for (const a of arrows.values()) if (!a.dead) drawArrow(ctx, a.x, a.y, a.a, a.t);
-
-      // الشخصيات (الأبعد للأعلى أولاً)
+      // الشخصيات الحاضرة ومواقعها المعروضة
       const heroes: { h: HeroSnap | null; entry: RosterEntry; x: number; y: number; a: number }[] = [];
       for (const entry of roster) {
         const h = s?.h.find((x) => x.i === entry.user) ?? null;
@@ -406,37 +406,119 @@ export function RaidGame({
           heroes.push({ h, entry, x: p.x, y: p.y, a: h?.a ?? (entry.team === 2 ? Math.PI : 0) });
         }
       }
-      heroes.sort((p, q) => p.y - q.y);
-      for (const { h, entry, x, y, a } of heroes) {
-        drawHero(
-          ctx,
-          {
-            x,
-            y,
-            angle: a,
-            team: entry.team,
-            name: name(entry.user),
-            hp: h?.hp ?? 100,
-            carried: h?.c ?? 0,
-            me: entry.user === userId,
-            dead: !!h && h.r !== 0,
-            shield: (h?.s ?? 1) === 1,
-            hurt: (flash.get(entry.user) ?? 0) > tf,
-          },
-          font,
-        );
-      }
+      const looks = heroes.map(({ h, entry, x, y, a }) => ({
+        x,
+        y,
+        angle: a,
+        team: entry.team,
+        name: name(entry.user),
+        hp: h?.hp ?? 100,
+        carried: h?.c ?? 0,
+        me: entry.user === userId,
+        dead: !!h && h.r !== 0,
+        shield: (h?.s ?? 1) === 1,
+        hurt: (flash.get(entry.user) ?? 0) > tf,
+        id: entry.user,
+      }));
 
-      for (let i = floaters.length - 1; i >= 0; i--) {
-        const f = floaters[i];
-        const age = (tf - f.born) / 1000;
-        if (age > 1) {
-          floaters.splice(i, 1);
-          continue;
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      if (scene) {
+        // ---------- ثلاثي الأبعاد ----------
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        scene.render({
+          heroes: looks.map((l) => ({
+            id: l.id,
+            team: l.team,
+            x: l.x,
+            y: l.y,
+            a: l.angle,
+            carried: l.carried,
+            dead: l.dead,
+            shield: l.shield,
+            hurt: l.hurt,
+            me: l.me,
+          })),
+          arrows: [...arrows.entries()].filter(([, a]) => !a.dead).map(([id, a]) => ({ id, ...a })),
+          chests: s ? s.ch.map((c) => c === 1) : CHESTS.map(() => true),
+          drops: s?.dr ?? [],
+          focus: me,
+          spectator: team === null,
+          tf,
+          dt,
+        });
+        // الأسماء والصحة فوق الرؤوس
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        for (const l of looks) {
+          const p = scene.project(l.x, l.y, 1.45);
+          if (!p.visible) continue;
+          if (!l.dead) {
+            ctx.fillStyle = "rgba(0,0,0,0.55)";
+            ctx.fillRect(p.sx - 18, p.sy, 36, 5);
+            ctx.fillStyle = l.hp > 50 ? "#4ade80" : l.hp > 25 ? "#facc15" : "#f87171";
+            ctx.fillRect(p.sx - 18, p.sy, (36 * l.hp) / 100, 5);
+          }
+          label(
+            ctx,
+            l.dead ? `💀 ${l.name}` : l.name,
+            p.sx,
+            p.sy - 5,
+            `bold 12px ${font}`,
+            l.me ? "#fde047" : "#ffffff",
+          );
+          if (l.carried > 0 && !l.dead) label(ctx, `💰${l.carried}`, p.sx, p.sy + 18, `bold 11px ${font}`, "#fde047");
         }
-        ctx.globalAlpha = 1 - age;
-        label(ctx, f.text, f.x, f.y - age * 24, `bold 13px ${font}`, f.color);
-        ctx.globalAlpha = 1;
+        for (let i = floaters.length - 1; i >= 0; i--) {
+          const f = floaters[i];
+          const age = (tf - f.born) / 1000;
+          if (age > 1) {
+            floaters.splice(i, 1);
+            continue;
+          }
+          const p = scene.project(f.x, f.y + 20, 1.9 + age * 0.8);
+          ctx.globalAlpha = 1 - age;
+          label(ctx, f.text, p.sx, p.sy, `bold 15px ${font}`, f.color);
+          ctx.globalAlpha = 1;
+        }
+      } else if (flat) {
+        // ---------- الرسم المسطح (احتياط) ----------
+        if (team !== null) {
+          const viewW = Math.min(WORLD_W, Math.max(480, Math.min(cssW, 820)));
+          cam.scale = cssW / viewW;
+        } else {
+          cam.scale = Math.min(cssW / WORLD_W, cssH / WORLD_H);
+        }
+        const vw = cssW / cam.scale;
+        const vh = cssH / cam.scale;
+        const fx = team !== null ? me.x : WORLD_W / 2;
+        const fy = team !== null ? me.y : WORLD_H / 2;
+        cam.x = vw >= WORLD_W ? (WORLD_W - vw) / 2 : Math.max(0, Math.min(WORLD_W - vw, fx - vw / 2));
+        cam.y = vh >= WORLD_H ? (WORLD_H - vh) / 2 : Math.max(0, Math.min(WORLD_H - vh, fy - vh / 2));
+
+        ctx.fillStyle = "#14250f";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const z = dpr * cam.scale;
+        ctx.setTransform(z, 0, 0, z, -cam.x * z, -cam.y * z);
+        ctx.drawImage(bg, 0, 0);
+        CHESTS.forEach((c, i) => drawChest(ctx, c.x, c.y, c.value, s ? s.ch[i] === 1 : true));
+        if (s) for (const d of s.dr) drawDrop(ctx, d.x, d.y, d.v, font);
+        for (const a of arrows.values()) if (!a.dead) drawArrow(ctx, a.x, a.y, a.a, a.t);
+        for (const l of [...looks].sort((p, q) => p.y - q.y)) drawHero(ctx, l, font);
+        for (let i = floaters.length - 1; i >= 0; i--) {
+          const f = floaters[i];
+          const age = (tf - f.born) / 1000;
+          if (age > 1) {
+            floaters.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = 1 - age;
+          label(ctx, f.text, f.x, f.y - age * 24, `bold 13px ${font}`, f.color);
+          ctx.globalAlpha = 1;
+        }
+      } else {
+        ctx.fillStyle = "#14250f";
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        label(ctx, "🏹 جارٍ تحميل القرية...", cssW / 2, cssH / 2, `bold 18px ${font}`, "#ffffff");
       }
 
       // ---------- الواجهة ----------
@@ -508,6 +590,8 @@ export function RaidGame({
     raf = requestAnimationFrame(frame);
 
     return () => {
+      disposed = true;
+      scene?.dispose();
       cancelAnimationFrame(raf);
       clearInterval(hostTimer);
       net.close();
@@ -547,7 +631,8 @@ export function RaidGame({
         className="relative w-full select-none overflow-hidden rounded-2xl border border-white/10 bg-[#14250f]"
         onContextMenu={(e) => e.preventDefault()}
       >
-        <canvas ref={canvasRef} className="block w-full touch-none" style={{ cursor: "crosshair" }} />
+        <canvas ref={glRef} className="block w-full" />
+        <canvas ref={canvasRef} className="absolute inset-0 block w-full touch-none" style={{ cursor: "crosshair" }} />
         {canFullscreen && (
           <button
             type="button"

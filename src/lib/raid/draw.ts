@@ -10,19 +10,23 @@ function rand(c: number, r: number, k = 0) {
   return s - Math.floor(s);
 }
 
-/** الخلفية الثابتة تُرسم مرة واحدة في canvas جانبي */
-export function renderBackground(): HTMLCanvasElement {
+/**
+ * الخلفية الثابتة تُرسم مرة واحدة في canvas جانبي.
+ * flat = أرضية فقط (للمشهد ثلاثي الأبعاد): بلا أشجار ولا أسطح ولا بئر ولا أعلام، فهذه تُبنى مجسمة
+ */
+export function renderBackground(flat = false, scale = 1): HTMLCanvasElement {
   const cv = document.createElement("canvas");
-  cv.width = WORLD_W;
-  cv.height = WORLD_H;
+  cv.width = WORLD_W * scale;
+  cv.height = WORLD_H * scale;
   const ctx = cv.getContext("2d")!;
+  ctx.scale(scale, scale);
 
   for (let r = 0; r < ROWS; r++)
     for (let c = 0; c < COLS; c++) {
       const x = c * TILE;
       const y = r * TILE;
       const cell = GRID[r][c];
-      const ground = cell === "," || cell === "s" || cell === "w" ? "road" : "grass";
+      const ground = cell === "," || cell === "s" || cell === "w" || (flat && cell === "#") ? "road" : "grass";
       if (ground === "grass") {
         ctx.fillStyle = rand(c, r) > 0.5 ? "#4e8d3b" : "#548f40";
         ctx.fillRect(x, y, TILE, TILE);
@@ -56,6 +60,8 @@ export function renderBackground(): HTMLCanvasElement {
           ctx.quadraticCurveTo(x + 22, wy + 4, x + 28, wy);
           ctx.stroke();
         }
+      } else if (flat) {
+        // البيوت والأكشاك مجسمة
       } else if (cell === "#") {
         drawRoofTile(ctx, c, r);
       } else if (cell === "s") {
@@ -72,7 +78,7 @@ export function renderBackground(): HTMLCanvasElement {
 
   // البئر (مجموعة مربعات w)
   const wells = cellsOf("w");
-  if (wells.length) {
+  if (wells.length && !flat) {
     const cx = (Math.min(...wells.map((w) => w[0])) + Math.max(...wells.map((w) => w[0])) + 1) * (TILE / 2);
     const cy = (Math.min(...wells.map((w) => w[1])) + Math.max(...wells.map((w) => w[1])) + 1) * (TILE / 2);
     ctx.fillStyle = "#6b7280";
@@ -99,6 +105,7 @@ export function renderBackground(): HTMLCanvasElement {
     ctx.lineWidth = 3;
     ctx.strokeRect(b.x0 + 1.5, b.y0 + 1.5, b.x1 - b.x0 - 3, b.y1 - b.y0 - 3);
     ctx.setLineDash([]);
+    if (flat) continue;
     // علم المعسكر
     const fx = (b.x0 + b.x1) / 2;
     const fy = b.y0 + 18;
@@ -117,7 +124,7 @@ export function renderBackground(): HTMLCanvasElement {
   }
 
   // الأشجار فوق كل شيء حتى تظهر تيجانها
-  for (const [c, r] of cellsOf("T")) drawTree(ctx, c, r);
+  if (!flat) for (const [c, r] of cellsOf("T")) drawTree(ctx, c, r);
   return cv;
 }
 
