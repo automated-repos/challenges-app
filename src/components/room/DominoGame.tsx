@@ -203,6 +203,7 @@ function tableTileSize(n: number) {
   return 24;
 }
 
+const TILE_GAP = 2; // المسافة بين القطع المتجاورة
 const END_A = "#f59e0b"; // لون الطرف الأول
 const END_B = "#38bdf8"; // لون الطرف الآخر
 
@@ -249,7 +250,11 @@ function Table({
 }) {
   const size = tableTileSize(chain.length);
   const [ref, width] = useWidth<HTMLDivElement>();
-  const perRow = Math.max(2, Math.floor((width + 6) / (size * 2 + 6)));
+  // كل القطع أفقية وبنفس العرض (حتى الدبل)، فكل الصفوف بنفس الطول بالضبط والقطع متلاصقة:
+  // نهاية كل صف تقع تحت/فوق بداية الصف التالي مباشرة، فتبقى السلسلة متصلة
+  const slot = size * 2;
+  const perRow = Math.max(2, Math.floor((width + TILE_GAP) / (slot + TILE_GAP)));
+  const rowWidth = perRow * slot + (perRow - 1) * TILE_GAP;
   const rows = snakeRows(chain, perRow);
   const last = chain.length - 1;
   return (
@@ -261,24 +266,40 @@ function Table({
         </p>
       ) : (
         <>
-          <div ref={ref} className="w-full space-y-1.5" dir="ltr">
-            {rows.map((row, r) => (
-              <div key={r} className={`flex items-center gap-1.5 ${r % 2 === 1 ? "justify-end" : "justify-start"}`}>
-                {row.map(({ tile, index }) => (
-                  <span
-                    key={index}
-                    className="rounded-md"
-                    style={
-                      index === 0 || index === last
-                        ? { boxShadow: `0 0 0 3px ${index === 0 ? END_A : END_B}` }
-                        : undefined
-                    }
+          <div ref={ref} className="w-full" dir="ltr">
+            <div className="mx-auto" style={{ width: rowWidth }}>
+              {rows.map((row, r) => (
+                <div key={r}>
+                  {/* وصلة الانعطاف: من نهاية الصف السابق إلى بداية هذا الصف (يمين ثم يسار بالتناوب) */}
+                  {r > 0 && (
+                    <div className={`flex ${r % 2 === 1 ? "justify-end" : "justify-start"}`}>
+                      <div className="flex justify-center" style={{ width: slot }}>
+                        <span className="block h-2.5 w-1 rounded-full bg-amber-200/80" />
+                      </div>
+                    </div>
+                  )}
+                  <div
+                    className={`flex items-center ${r % 2 === 1 ? "justify-end" : "justify-start"}`}
+                    style={{ gap: TILE_GAP }}
                   >
-                    <DominoTile tile={tile} size={size} vertical={tile[0] === tile[1]} />
-                  </span>
-                ))}
-              </div>
-            ))}
+                    {row.map(({ tile, index }) => (
+                      <span key={index} className="flex shrink-0 justify-center" style={{ width: slot }}>
+                        <span
+                          className="rounded-md"
+                          style={
+                            index === 0 || index === last
+                              ? { boxShadow: `0 0 0 3px ${index === 0 ? END_A : END_B}` }
+                              : undefined
+                          }
+                        >
+                          <DominoTile tile={tile} size={size} />
+                        </span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
           <div className="flex items-center justify-center gap-3" dir="ltr">
             <EndBadge value={ends?.[0]} color={END_A} active={!!picked} onClick={() => onSide("left")} />
